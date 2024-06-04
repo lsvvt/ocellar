@@ -1,0 +1,21 @@
+[project]
+name = "ocellar"
+version = "0.1.0"
+description = "ocellar: cut structures"
+authors = [
+    {name = "lsvvt", email = "losev.tim.v@gmail.com"},
+]
+dependencies = [
+    "scipy>=1.13.1",
+]
+requires-python = ">=3.12"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
