@@ -1,12 +1,14 @@
 [project]
 name = "ocellar"
 version = "0.1.0"
-description = "ocellar: cut structures"
+description = "Default template for PDM package"
 authors = [
     {name = "lsvvt", email = "losev.tim.v@gmail.com"},
+    {name = "lsvvt", email = "lsvvt@github.com"},
 ]
 dependencies = [
     "scipy>=1.13.1",
+    "openbabel-wheel>=3.1.1.19",
 ]
 requires-python = ">=3.12"
 readme = "README.md"
@@ -15,7 +17,6 @@ license = {text = "MIT"}
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
-
 
 [tool.pdm]
 distribution = true

@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:f0bfbee4fc2066fbb41aa97ce6a3cb0f0ef5a14896897440e0c6aa61129379fe"
+content_hash = "sha256:c30af59ae5f2ab872c5866586b7eda30712ab72d4380a5e2b56a70b7535072f8"
 
 [[package]]
 name = "numpy"
@@ -26,6 +26,20 @@ files = [
     {file = "numpy-1.26.4-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:95a7476c59002f2f6c590b9b7b998306fba6a5aa646b1e22ddfeaf8f78c3a29c"},
     {file = "numpy-1.26.4-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:7e50d0a0cc3189f9cb0aeb3a6a6af18c16f59f004b866cd2be1c14b36134a4a0"},
     {file = "numpy-1.26.4.tar.gz", hash = "sha256:2a02aba9ed12e4ac4eb3ea9421c420301a0c6460d9830d74a9df87efa4912010"},
+]
+
+[[package]]
+name = "openbabel-wheel"
+version = "3.1.1.19"
+requires_python = ">=3.7"
+summary = "An unofficial repository to distribute OpenBabel prebuilt wheels through Pypi.."
+groups = ["default"]
+files = [
+    {file = "openbabel-wheel-3.1.1.19.tar.gz", hash = "sha256:3f2a04645b462faf34e3f5a3f87d3e09d97ac35390ac15ade3881ce00a4c51fd"},
+    {file = "openbabel_wheel-3.1.1.19-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:1d72e43d934e24a59d3c17195fb1ae9dd31603fa56d7c0b86dff68696efb9182"},
+    {file = "openbabel_wheel-3.1.1.19-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:522585417376163b7d068c57f235cb8a517151f6f4a0179287fad93d981ccb33"},
+    {file = "openbabel_wheel-3.1.1.19-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f3d6ba16154f9d2d374e7fe4b445fd347d180dc2995d8e6973a84aed162d12d1"},
+    {file = "openbabel_wheel-3.1.1.19-cp312-cp312-win_amd64.whl", hash = "sha256:213a5c8b75ff75273c33a5107809d815b87a70cb4b8a9c68630375313e35d47c"},
 ]
 
 [[package]]
