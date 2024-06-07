@@ -9,6 +9,7 @@ authors = [
 dependencies = [
     "scipy>=1.13.1",
     "openbabel-wheel>=3.1.1.19",
+    "cclib>=1.8.1",
 ]
 requires-python = ">=3.12"
 readme = "README.md"
@@ -20,3 +21,23 @@ build-backend = "pdm.backend"
 
 [tool.pdm]
 distribution = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "D", "I", "N", "UP", "ANN", "S", "BLE", "FBT", "B"]
+ignore = ["D203", "D213", "ANN101", "ANN102"]
+fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["WPS306", "WPS305", "DAR101", "DAR201"]
+inline-quotes = "double"
