@@ -2,19 +2,30 @@
 
 import numpy
 import periodictable
+import networkx
 from openbabel import openbabel, pybel  # type: ignore
+from typing import Tuple
+
 
 from ocellar.io.driver import Driver
 
 
 class DOpenbabel(Driver):
-    """Class for a driver for interfacing with the openbabel library."""
+    """
+    Class for a driver for interfacing with the openbabel library.
+
+    Attributes
+    ----------
+    backend : str
+        The name of the backend library used, set to "openbabel".
+    """
 
     backend = "openbabel"
 
     @classmethod
-    def _build_geometry(cls, input_geometry: str) -> tuple[list, numpy.ndarray]:
-        """Build the geometry from the input file using openbabel.
+    def _build_geometry(cls, input_geometry: str) -> Tuple[list, numpy.ndarray]:
+        """
+        Build the geometry from the input file using openbabel.
 
         Parameters
         ----------
@@ -23,10 +34,10 @@ class DOpenbabel(Driver):
 
         Returns
         -------
-        tuple
+        Tuple
             A tuple containing:
-                - list: A list of element symbols.
-                - numpy.ndarray: An array of atomic coordinates.
+            - list: A list of element symbols.
+            - numpy.ndarray: An array of atomic coordinates.
 
         """
         mol = next(pybel.readfile("xyz", input_geometry))
@@ -34,10 +45,24 @@ class DOpenbabel(Driver):
         coordinates = numpy.array([atom.coords for atom in mol.atoms])
         return elements, coordinates
 
+
     @classmethod
-    def _build_bonds(
-        cls, geometry: tuple[list, numpy.ndarray]
-) -> tuple[numpy.ndarray, numpy.ndarray]:
+    def _build_bonds(cls, geometry: Tuple[list, numpy.ndarray]) -> networkx.Graph:
+        """
+        Build a graph representation of molecular bonds using openbabel.
+
+        Parameters
+        ----------
+        geometry : Tuple
+            A tuple containing:
+            - list: A list of element symbols.
+            - numpy.ndarray: An array of atomic coordinates.
+
+        Returns
+        -------
+        networkx.Graph
+            A graph representation of the molecular structure with bonds as edges.
+        """
         obmol = openbabel.OBMol()
 
         for i, element in enumerate(geometry[0]):
@@ -51,4 +76,8 @@ class DOpenbabel(Driver):
         obmol.ConnectTheDots()
         obmol.PerceiveBondOrders()
 
-        return obmol ### Тут я остановился...
+        molecule_graph = networkx.Graph()
+        for bond in openbabel.OBMolBondIter(obmol):
+            molecule_graph.add_edge(bond.GetBeginAtomIdx() - 1, bond.GetEndAtomIdx() - 1, order=bond.GetBondOrder())
+
+        return molecule_graph

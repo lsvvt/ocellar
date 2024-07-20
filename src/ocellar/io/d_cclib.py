@@ -3,17 +3,25 @@
 import cclib
 import numpy
 import periodictable
+from typing import Tuple
 
 from ocellar.io.driver import Driver
 
 
 class DCclib(Driver):
-    """Class for a driver for interfacing with the cclib library."""
+    """
+    Class for a driver for interfacing with the cclib library.
+
+    Attributes
+    ----------
+    backend : str
+        The name of the backend library used, set to "cclib".
+    """
 
     backend = "cclib"
 
     @classmethod
-    def _build_geometry(cls, input_geometry: str) -> tuple[list, numpy.ndarray]:
+    def _build_geometry(cls, input_geometry: str) -> Tuple[list, numpy.ndarray]:
         """Build the geometry from the input file using cclib.
 
         Parameters
@@ -23,10 +31,10 @@ class DCclib(Driver):
 
         Returns
         -------
-        tuple
+        Tuple
             A tuple containing:
-                - list: A list of element symbols.
-                - numpy.ndarray: An array of atomic coordinates.
+            - list: A list of element symbols.
+            - numpy.ndarray: An array of atomic coordinates.
 
         """
         parsed_data = cclib.io.ccread(input_geometry)
@@ -35,3 +43,35 @@ class DCclib(Driver):
         ]
         coordinates = parsed_data.atomcoords[-1]
         return elements, coordinates
+
+
+    @classmethod
+    def _save_xyz(cls, file_name: str, geometry: Tuple[list, numpy.ndarray]) -> None:
+        """
+        Save the geometry in XYZ format using cclib.
+
+        Parameters
+        ----------
+        file_name : str
+            The name of the file to save the XYZ data.
+        geometry : Tuple
+            A tuple containing:
+            - list: A list of element symbols.
+            - numpy.ndarray: An array of atomic coordinates.
+
+        Returns
+        -------
+        None
+        """
+        attributes = {
+            "natom": len(geometry[0]),
+            "atomnos": [periodictable.elements.symbol(atom).number for atom in geometry[0]],
+            "atomcoords": [geometry[1]],
+            "metadata": "",
+        }
+
+        data = cclib.parser.data.ccData(attributes)
+        xyz = cclib.io.xyzwriter.XYZ(data)
+
+        with open(file_name, "w") as f:
+            f.writelines(xyz.generate_repr())
