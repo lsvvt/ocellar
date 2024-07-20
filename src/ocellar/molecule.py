@@ -55,11 +55,11 @@ class Molecule:
         ValueError
             If input_geometry is not defined.
         """
-        if self.input_geometry:
-            driver = io.Driver(backend)
-            self.geometry = driver._build_geometry(self.input_geometry)
-        else:
+        if self.input_geometry is None:
             raise ValueError("input_geometry is not defined")
+        
+        driver = io.Driver(backend)
+        self.geometry = driver._build_geometry(self.input_geometry)
 
 
     def build_graph(self, backend: str = "openbabel") -> None:
@@ -71,11 +71,11 @@ class Molecule:
         backend : str, optional
             The backend to use for building the graph (default is "openbabel").
         """
-        if self.geometry:
-            driver = io.Driver(backend)
-            self.graph = driver._build_bonds(self.geometry)
-        else:
-            self.build_geometry()
+        if self.graph is None:
+            raise ValueError("Geometry is not built. Call build_geometry() first.")
+        
+        driver = io.Driver(backend)
+        self.graph = driver._build_bonds(self.geometry)
 
 
     def save_xyz(self, file_name: str, backend: str = "cclib") -> None:
