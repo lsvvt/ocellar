@@ -68,7 +68,7 @@ class Molecule:
             The backend to use for building the graph (default is "openbabel").
 
         """
-        if self.graph is None:
+        if self.geometry is None:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
 
         driver = io.Driver(backend)
