@@ -3,7 +3,6 @@ from ocellar import utils
 import networkx
 from scipy.spatial import cKDTree
 import numpy
-from typing import List
 
 
 class Molecule:
@@ -14,14 +13,14 @@ class Molecule:
     ----------
     input_geometry : str or None
         Path to the input geometry file.
-    geometry : Tuple[list, numpy.ndarray] or None
+    geometry : tuple[list, numpy.ndarray] or None
         A tuple containing:
         - list: A list of element symbols.
         - numpy.ndarray: An array of atomic coordinates.
     graph : networkx.Graph or None
         Graph representation of the molecular structure.
     subgraphs : list or None
-        List of connected components in the molecular graph.
+        list of connected components in the molecular graph.
 
     """
 
@@ -108,20 +107,20 @@ class Molecule:
         self.subgraphs = [c for c in networkx.connected_components(cutted_graph)]
 
 
-    def select_r(self, x: List[float], r: float) -> List[int]:
+    def select_r(self, x: list[float], r: float) -> list[int]:
         """
         Select atoms within a given radius of a point.
 
         Parameters
         ----------
-        x : List[float]
+        x : list[float]
             The center point coordinates.
         r : float
             The radius within which to select atoms.
 
         Returns
         -------
-        List[int]
+        list[int]
             Indices of atoms within the specified radius.
         """
         if self.geometry is None:
@@ -132,14 +131,14 @@ class Molecule:
         return idx
 
 
-    def select(self, idxs: List[int]) -> 'Molecule':
+    def select(self, idxs: list[int]) -> 'Molecule':
         """
         Select a subset of the molecule based on atom indices.
 
         Parameters
         ----------
-        idxs : List[int]
-            List of atom indices to select.
+        idxs : list[int]
+            list of atom indices to select.
 
         Returns
         -------

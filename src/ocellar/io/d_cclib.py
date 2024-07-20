@@ -3,7 +3,6 @@
 import cclib
 import numpy
 import periodictable
-from typing import Tuple
 
 from ocellar.io.driver import Driver
 
@@ -21,7 +20,7 @@ class DCclib(Driver):
     backend = "cclib"
 
     @classmethod
-    def _build_geometry(cls, input_geometry: str) -> Tuple[list, numpy.ndarray]:
+    def _build_geometry(cls, input_geometry: str) -> tuple[list, numpy.ndarray]:
         """Build the geometry from the input file using cclib.
 
         Parameters
@@ -31,7 +30,7 @@ class DCclib(Driver):
 
         Returns
         -------
-        Tuple
+        tuple
             A tuple containing:
             - list: A list of element symbols.
             - numpy.ndarray: An array of atomic coordinates.
@@ -46,7 +45,7 @@ class DCclib(Driver):
 
 
     @classmethod
-    def _save_xyz(cls, file_name: str, geometry: Tuple[list, numpy.ndarray]) -> None:
+    def _save_xyz(cls, file_name: str, geometry: tuple[list, numpy.ndarray]) -> None:
         """
         Save the geometry in XYZ format using cclib.
 
@@ -54,7 +53,7 @@ class DCclib(Driver):
         ----------
         file_name : str
             The name of the file to save the XYZ data.
-        geometry : Tuple
+        geometry : tuple
             A tuple containing:
             - list: A list of element symbols.
             - numpy.ndarray: An array of atomic coordinates.

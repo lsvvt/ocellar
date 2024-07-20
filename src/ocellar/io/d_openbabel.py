@@ -4,7 +4,6 @@ import numpy
 import periodictable
 import networkx
 from openbabel import openbabel, pybel  # type: ignore
-from typing import Tuple
 
 
 from ocellar.io.driver import Driver
@@ -23,7 +22,7 @@ class DOpenbabel(Driver):
     backend = "openbabel"
 
     @classmethod
-    def _build_geometry(cls, input_geometry: str) -> Tuple[list, numpy.ndarray]:
+    def _build_geometry(cls, input_geometry: str) -> tuple[list, numpy.ndarray]:
         """
         Build the geometry from the input file using openbabel.
 
@@ -34,7 +33,7 @@ class DOpenbabel(Driver):
 
         Returns
         -------
-        Tuple
+        tuple
             A tuple containing:
             - list: A list of element symbols.
             - numpy.ndarray: An array of atomic coordinates.
@@ -47,13 +46,13 @@ class DOpenbabel(Driver):
 
 
     @classmethod
-    def _build_bonds(cls, geometry: Tuple[list, numpy.ndarray]) -> networkx.Graph:
+    def _build_bonds(cls, geometry: tuple[list, numpy.ndarray]) -> networkx.Graph:
         """
         Build a graph representation of molecular bonds using openbabel.
 
         Parameters
         ----------
-        geometry : Tuple
+        geometry : tuple
             A tuple containing:
             - list: A list of element symbols.
             - numpy.ndarray: An array of atomic coordinates.
