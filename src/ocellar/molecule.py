@@ -91,8 +91,7 @@ class Molecule:
 
 
     def build_structure(self) -> None:
-        """Build the substructure of the molecule by identifying connected components.
-        """
+        """Build the substructure of the molecule by identifying connected components."""
         if self.graph is None:
             raise ValueError("Graph is not built. Call build_graph() first.")
 
