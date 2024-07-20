@@ -1,13 +1,12 @@
-from ocellar import io
-from ocellar import utils
 import networkx
-from scipy.spatial import cKDTree
 import numpy
+from scipy.spatial import cKDTree
+
+from ocellar import io, utils
 
 
 class Molecule:
-    """
-    A class to represent a molecule and its properties.
+    """A class to represent a molecule and its properties.
 
     Attributes
     ----------
@@ -25,14 +24,13 @@ class Molecule:
     """
 
     def __init__(self, **kwargs) -> None:
-        """
-        Initialize the Molecule object.
-
+        """Initialize the Molecule object.
 
         Parameters
         ----------
         **kwargs
             Arbitrary keyword arguments to set as attributes.
+
         """
         self.input_geometry = None
         self.geometry = None
@@ -41,8 +39,7 @@ class Molecule:
 
 
     def build_geometry(self, backend: str = "cclib") -> None:
-        """
-        Build the geometry of the molecule.
+        """Build the geometry of the molecule.
 
         Parameters
         ----------
@@ -53,33 +50,33 @@ class Molecule:
         ------
         ValueError
             If input_geometry is not defined.
+
         """
         if self.input_geometry is None:
             raise ValueError("input_geometry is not defined")
-        
+
         driver = io.Driver(backend)
         self.geometry = driver._build_geometry(self.input_geometry)
 
 
     def build_graph(self, backend: str = "openbabel") -> None:
-        """
-        Build the graph representation of the molecule.
+        """Build the graph representation of the molecule.
 
         Parameters
         ----------
         backend : str, optional
             The backend to use for building the graph (default is "openbabel").
+
         """
         if self.graph is None:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
-        
+
         driver = io.Driver(backend)
         self.graph = driver._build_bonds(self.geometry)
 
 
     def save_xyz(self, file_name: str, backend: str = "cclib") -> None:
-        """
-        Save the molecule geometry in XYZ format.
+        """Save the molecule geometry in XYZ format.
 
         Parameters
         ----------
@@ -87,29 +84,28 @@ class Molecule:
             The name of the file to save the XYZ data.
         backend : str, optional
             The backend to use for saving XYZ (default is "cclib").
+
         """
         driver = io.Driver(backend)
         driver._save_xyz(file_name, self.geometry)
 
 
     def build_structure(self) -> None:
-        """
-        Build the substructure of the molecule by identifying connected components.
+        """Build the substructure of the molecule by identifying connected components.
         """
         if self.graph is None:
             raise ValueError("Graph is not built. Call build_graph() first.")
-        
+
         cutted_graph = self.graph.copy()
         single_bonds = [(u, v) for u, v, d in cutted_graph.edges(data=True) if d['order'] == 1]
         for u, v in single_bonds:
             cutted_graph.remove_edge(u, v)
-            
+
         self.subgraphs = [c for c in networkx.connected_components(cutted_graph)]
 
 
     def select_r(self, x: list[float], r: float) -> list[int]:
-        """
-        Select atoms within a given radius of a point.
+        """Select atoms within a given radius of a point.
 
         Parameters
         ----------
@@ -122,18 +118,18 @@ class Molecule:
         -------
         list[int]
             Indices of atoms within the specified radius.
+
         """
         if self.geometry is None:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
-        
+
         tree = cKDTree(self.geometry[1])
         idx = tree.query_ball_point(x, r)
         return idx
 
 
     def select(self, idxs: list[int]) -> 'Molecule':
-        """
-        Select a subset of the molecule based on atom indices.
+        """Select a subset of the molecule based on atom indices.
 
         Parameters
         ----------
@@ -144,10 +140,11 @@ class Molecule:
         -------
         Molecule
             A new Molecule object containing the selected atoms and necessary hydrogens.
+
         """
         if self.geometry is None or self.graph is None or self.subgraphs is None:
             raise ValueError("Molecule structure is not fully built. Call build_geometry(), build_graph(), and build_structure() first.")
-        
+
         selected_n = []
         for graph in self.subgraphs:
             if any(idx in idxs for idx in graph):

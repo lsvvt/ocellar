@@ -1,30 +1,28 @@
 """Module to handle molecule operations using Open Babel."""
 
+import networkx
 import numpy
 import periodictable
-import networkx
 from openbabel import openbabel, pybel  # type: ignore
-
 
 from ocellar.io.driver import Driver
 
 
 class DOpenbabel(Driver):
-    """
-    Class for a driver for interfacing with the openbabel library.
+    """Class for a driver for interfacing with the openbabel library.
 
     Attributes
     ----------
     backend : str
         The name of the backend library used, set to "openbabel".
+
     """
 
     backend = "openbabel"
 
     @classmethod
     def _build_geometry(cls, input_geometry: str) -> tuple[list, numpy.ndarray]:
-        """
-        Build the geometry from the input file using openbabel.
+        """Build the geometry from the input file using openbabel.
 
         Parameters
         ----------
@@ -47,8 +45,7 @@ class DOpenbabel(Driver):
 
     @classmethod
     def _build_bonds(cls, geometry: tuple[list, numpy.ndarray]) -> networkx.Graph:
-        """
-        Build a graph representation of molecular bonds using openbabel.
+        """Build a graph representation of molecular bonds using openbabel.
 
         Parameters
         ----------
@@ -61,6 +58,7 @@ class DOpenbabel(Driver):
         -------
         networkx.Graph
             A graph representation of the molecular structure with bonds as edges.
+
         """
         obmol = openbabel.OBMol()
 

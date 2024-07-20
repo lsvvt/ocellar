@@ -8,13 +8,13 @@ from ocellar.io.driver import Driver
 
 
 class DCclib(Driver):
-    """
-    Class for a driver for interfacing with the cclib library.
+    """Class for a driver for interfacing with the cclib library.
 
     Attributes
     ----------
     backend : str
         The name of the backend library used, set to "cclib".
+
     """
 
     backend = "cclib"
@@ -46,8 +46,7 @@ class DCclib(Driver):
 
     @classmethod
     def _save_xyz(cls, file_name: str, geometry: tuple[list, numpy.ndarray]) -> None:
-        """
-        Save the geometry in XYZ format using cclib.
+        """Save the geometry in XYZ format using cclib.
 
         Parameters
         ----------
@@ -61,6 +60,7 @@ class DCclib(Driver):
         Returns
         -------
         None
+
         """
         attributes = {
             "natom": len(geometry[0]),
