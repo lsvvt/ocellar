@@ -2,7 +2,9 @@
 tools: pdm, ruff, wemake-python-styleguide, pflake8
 
 ## installation
-use pdm
+```bash
+pdm install
+```
 
 ## usage
 ```python
