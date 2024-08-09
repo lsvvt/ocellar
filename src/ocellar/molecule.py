@@ -89,6 +89,21 @@ class Molecule:
         driver = io.Driver(backend)
         driver._save_xyz(file_name, self.geometry)
 
+    
+    def save_pdb(self, file_name: str, backend: str = "openbabel") -> None:
+        """Save the molecule geometry in PDB format.
+
+        Parameters
+        ----------
+        file_name : str
+            The name of the file to save the PDB data.
+        backend : str, optional
+            The backend to use for saving PDB (default is "openbabel").
+
+        """
+        driver = io.Driver(backend)
+        driver._save_pdb(file_name, self.geometry)
+
 
     def build_structure(self) -> None:
         """Build the substructure of the molecule by identifying connected components."""

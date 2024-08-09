@@ -78,3 +78,35 @@ class DOpenbabel(Driver):
             molecule_graph.add_edge(bond.GetBeginAtomIdx() - 1, bond.GetEndAtomIdx() - 1, order=bond.GetBondOrder())
 
         return molecule_graph
+    
+
+    @classmethod
+    def _save_pdb(cls, file_name: str, geometry: tuple[list, numpy.ndarray]) -> None:
+        """Save the geometry in PDB format using openbabel.
+
+        Parameters
+        ----------
+        file_name : str
+            The name of the file to save the PDB data.
+        geometry : tuple
+            A tuple containing:
+            - list: A list of element symbols.
+            - numpy.ndarray: An array of atomic coordinates.
+
+        Returns
+        -------
+        None
+
+        """
+        obmol = openbabel.OBMol()
+
+        for i, element in enumerate(geometry[0]):
+            atom = obmol.NewAtom()
+            atom.SetAtomicNum(
+                periodictable.elements.symbol(element).number
+            )
+            x, y, z = geometry[1][i]
+            atom.SetVector(x, y, z)
+        
+        mol = pybel.Molecule(obmol)
+        mol.write('pdb', file_name, overwrite=True)
