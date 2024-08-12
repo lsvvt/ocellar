@@ -11,6 +11,8 @@ dependencies = [
     "openbabel-wheel>=3.1.1.19",
     "cclib>=1.8.1",
     "networkx[default]>=3.3",
+    "MDAnalysis>=2.7.0",
+    "openmm>=8.1.1",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
