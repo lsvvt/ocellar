@@ -104,6 +104,25 @@ class Molecule:
         driver = io.Driver(backend)
         driver._save_pdb(file_name, self.geometry)
 
+    
+    def save_dump(self, file_name: str, input_geometry: str, idxs: list[int], backend: str = "MDAnalysis") -> None:
+        """Save the molecule geometry in LAMMPS dump format.
+
+        Parameters
+        ----------
+        file_name : str
+            The name of the file to save the dump data.
+        input_geometry : str or None
+            Path to the input geometry file.
+        idxs : list[int]
+            Indices of atoms.
+        backend : str, optional
+            The backend to use for saving dump (default is "MDAnalysis").
+
+        """
+        driver = io.Driver(backend)
+        driver._save_dump(file_name, input_geometry, idxs)
+
 
     def build_structure(self) -> None:
         """Build the substructure of the molecule by identifying connected components."""
@@ -142,7 +161,7 @@ class Molecule:
         return idx
 
 
-    def select(self, idxs: list[int]) -> 'Molecule':
+    def select(self, idxs: list[int]) -> tuple['Molecule', list[int]]:
         """Select a subset of the molecule based on atom indices.
 
         Parameters
@@ -154,6 +173,10 @@ class Molecule:
         -------
         Molecule
             A new Molecule object containing the selected atoms and necessary hydrogens.
+        tuple
+            A tuple containing:
+            - Molecule: A new Molecule object containing the selected atoms and necessary hydrogens.
+            - list[int]: An array of selected atoms index.
 
         """
         if self.geometry is None or self.graph is None or self.subgraphs is None:
@@ -174,4 +197,4 @@ class Molecule:
         new_molecule.geometry = ([self.geometry[0][i] for i in selected_n] + ["H"] * len(new_at),
                                  numpy.append(self.geometry[1][selected_n], numpy.array(new_at), axis = 0))
 
-        return new_molecule
+        return new_molecule, selected_n
