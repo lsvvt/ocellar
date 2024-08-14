@@ -6,8 +6,8 @@ tools: pdm, ruff, wemake-python-styleguide, pflake8
 2) 
 ```bash
 pdm install
+. .venv/bin/activate
 ```
-3) . .venv/bin/activate
 
 ## usage
 ```python
