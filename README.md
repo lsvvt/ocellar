@@ -2,9 +2,12 @@
 tools: pdm, ruff, wemake-python-styleguide, pflake8
 
 ## installation
+1) Install pdm https://pdm-project.org/en/latest
+2) 
 ```bash
 pdm install
 ```
+3) . .venv/bin/activate
 
 ## usage
 ```python
