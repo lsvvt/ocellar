@@ -71,5 +71,6 @@ class DMDAnalysis(Driver):
         with open(input_geometry, "r") as f:
             out_lines = [line for line in f 
                 if not (len(line.split()) > 5 and line.split()[0] not in s_idxs and line.split()[2].replace('.', '', 1).isdigit())]
+            out_lines[out_lines.index("ITEM: NUMBER OF ATOMS\n") + 1] = str(len(idxs)) + "\n"
             with open(file_name, "w") as f_out:
                 f_out.writelines(out_lines)
