@@ -132,7 +132,8 @@ class Molecule:
         cutted_graph = self.graph.copy()
         single_bonds = [(u, v) for u, v, d in cutted_graph.edges(data=True) if d['order'] == 1]
         for u, v in single_bonds:
-            if "H" not in [self.geometry[0][u], self.geometry[0][v]]:
+            #if "H" not in [self.geometry[0][u], self.geometry[0][v]]:
+            if len(list(self.graph.neighbors(u))) > 1 and len(list(self.graph.neighbors(v))) > 1:
                 cutted_graph.remove_edge(u, v)
 
         self.subgraphs = [c for c in networkx.connected_components(cutted_graph)]
@@ -198,7 +199,6 @@ class Molecule:
         new_molecule.geometry = ([self.geometry[0][i] for i in selected_n],
                                  self.geometry[1][selected_n])
         if len(new_at) > 0:
-            new_molecule.geometry[0] += ["H"] * len(new_at)
-            new_molecule.geometry[1] = numpy.append(new_molecule.geometry, numpy.array(new_at), axis = 0)
+            new_molecule.geometry = (new_molecule.geometry[0] + ["H"] * len(new_at), numpy.append(new_molecule.geometry[1], numpy.array(new_at), axis = 0))
 
         return new_molecule, selected_n
