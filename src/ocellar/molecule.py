@@ -124,17 +124,18 @@ class Molecule:
         driver._save_dump(file_name, input_geometry, idxs)
 
 
-    def build_structure(self) -> None:
+    def build_structure(self, cut_molecule: bool = True) -> None:
         """Build the substructure of the molecule by identifying connected components."""
         if self.graph is None:
             raise ValueError("Graph is not built. Call build_graph() first.")
 
         cutted_graph = self.graph.copy()
-        single_bonds = [(u, v) for u, v, d in cutted_graph.edges(data=True) if d['order'] == 1]
-        for u, v in single_bonds:
-            #if "H" not in [self.geometry[0][u], self.geometry[0][v]]:
-            if len(list(self.graph.neighbors(u))) > 1 and len(list(self.graph.neighbors(v))) > 1:
-                cutted_graph.remove_edge(u, v)
+        if cut_molecule:
+            single_bonds = [(u, v) for u, v, d in cutted_graph.edges(data=True) if d['order'] == 1]
+            for u, v in single_bonds:
+                #if "H" not in [self.geometry[0][u], self.geometry[0][v]]:
+                if len(list(self.graph.neighbors(u))) > 1 and len(list(self.graph.neighbors(v))) > 1:
+                    cutted_graph.remove_edge(u, v)
 
         self.subgraphs = [c for c in networkx.connected_components(cutted_graph)]
 
