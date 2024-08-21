@@ -42,10 +42,13 @@ class DMDAnalysis(Driver):
         coordinates = u.atoms.positions.astype(float)
 
         with open(input_geometry, "r") as f:
-            elements = [openmm.app.Element.getByMass(float(line.split()[2])).symbol for line in f 
+            lines = f.readlines()
+            elements = [openmm.app.Element.getByMass(float(line.split()[2])).symbol for line in lines 
+                if len(line.split()) > 5 and line.split()[2].replace('.', '', 1).isdigit()]
+            coordinates = [list(map(float, line.split()[3:6])) for line in lines 
                 if len(line.split()) > 5 and line.split()[2].replace('.', '', 1).isdigit()]
 
-        return elements, coordinates
+        return elements, numpy.array(coordinates)
 
 
     @classmethod
