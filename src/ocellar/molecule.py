@@ -197,6 +197,8 @@ class Molecule:
                     new_at.append(utils.norm(self.geometry[1][neighbor] - self.geometry[1][atom]) * 1.09 + self.geometry[1][atom])
 
         new_molecule = Molecule()
+        
+        selected_n.sort()
         new_molecule.geometry = ([self.geometry[0][i] for i in selected_n],
                                  self.geometry[1][selected_n])
         if len(new_at) > 0:
