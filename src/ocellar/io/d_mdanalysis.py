@@ -45,10 +45,12 @@ class DMDAnalysis(Driver):
             lines = f.readlines()
             elements = [openmm.app.Element.getByMass(float(line.split()[2])).symbol for line in lines 
                 if len(line.split()) > 5 and line.split()[2].replace('.', '', 1).isdigit()]
-            coordinates = [list(map(float, line.split()[3:6])) for line in lines 
-                if len(line.split()) > 5 and line.split()[2].replace('.', '', 1).isdigit()]
+            # my code
+            # coordinates = [list(map(float, line.split()[3:6])) for line in lines 
+            #     if len(line.split()) > 5 and line.split()[2].replace('.', '', 1).isdigit()]
+        # coordinates = numpy.array(coordinates)
 
-        return elements, numpy.array(coordinates)
+        return elements, coordinates
 
 
     @classmethod

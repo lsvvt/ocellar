@@ -69,14 +69,15 @@ class DCclib(Driver):
             "metadata": "",
         }
 
-        # data = cclib.parser.data.ccData(attributes)
-        # xyz = cclib.io.xyzwriter.XYZ(data)
+        data = cclib.parser.data.ccData(attributes)
+        xyz = cclib.io.xyzwriter.XYZ(data)
 
-        # with open(file_name, "w") as f:
-        #     f.writelines(xyz.generate_repr())
+        with open(file_name, "w") as f:
+            f.writelines(xyz.generate_repr())
 
-        with open(file_name, 'w') as f:
-            f.write(f"{attributes['natom']}\n")
-            f.write(f"{attributes['metadata']}\n")
-            for atom, coord in zip(geometry[0], geometry[1]):
-                f.write(f"{atom} {coord[0]:.6f} {coord[1]:.6f} {coord[2]:.6f}\n")
+        # My code
+        # with open(file_name, 'w') as f:
+        #     f.write(f"{attributes['natom']}\n")
+        #     f.write(f"{attributes['metadata']}\n")
+        #     for atom, coord in zip(geometry[0], geometry[1]):
+        #         f.write(f"{atom} {coord[0]:.6f} {coord[1]:.6f} {coord[2]:.6f}\n")
