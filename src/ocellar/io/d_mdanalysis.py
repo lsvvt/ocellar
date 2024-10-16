@@ -51,31 +51,3 @@ class DMDAnalysis(Driver):
         # coordinates = numpy.array(coordinates)
 
         return elements, coordinates
-
-
-    @classmethod
-    def _save_dump(cls, file_name: str, input_geometry: str, idxs: list[int]) -> None:
-        """Save the geometry in LAMMPS dump format using cclib.
-
-        Parameters
-        ----------
-        file_name : str
-            The name of the file to save the dump data.
-        input_geometry : str or None
-            Path to the input geometry file.
-        idxs : list[int]
-            Indices of atoms.
-
-        Returns
-        -------
-        None
-
-        """
-        s_idxs = list(map(lambda x: str(x + 1), idxs))
-        
-        with open(input_geometry, "r") as f:
-            out_lines = [line for line in f 
-                if not (len(line.split()) > 5 and line.split()[0] not in s_idxs and line.split()[2].replace('.', '', 1).isdigit())]
-            out_lines[out_lines.index("ITEM: NUMBER OF ATOMS\n") + 1] = str(len(idxs)) + "\n"
-            with open(file_name, "w") as f_out:
-                f_out.writelines(out_lines)

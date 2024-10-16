@@ -105,7 +105,7 @@ class Molecule:
         driver._save_pdb(file_name, self.geometry)
 
     
-    def save_dump(self, file_name: str, input_geometry: str, idxs: list[int], backend: str = "MDAnalysis") -> None:
+    def save_dump(self, file_name: str, input_geometry: str, idxs: list[int], backend: str = "internal") -> None:
         """Save the molecule geometry in LAMMPS dump format.
 
         Parameters
@@ -117,11 +117,30 @@ class Molecule:
         idxs : list[int]
             Indices of atoms.
         backend : str, optional
-            The backend to use for saving dump (default is "MDAnalysis").
+            The backend to use for saving dump (default is "internal").
 
         """
         driver = io.Driver(backend)
         driver._save_dump(file_name, input_geometry, idxs)
+
+
+    def save_cfg(self, file_name: str, input_geometry: str, idxs: list[int], backend: str = "internal") -> None:
+        """Save the molecule geometry in LAMMPS dump format.
+
+        Parameters
+        ----------
+        file_name : str
+            The name of the file to save the dump data.
+        input_geometry : str or None
+            Path to the input geometry file.
+        idxs : list[int]
+            Indices of atoms.
+        backend : str, optional
+            The backend to use for saving dump (default is "internal").
+
+        """
+        driver = io.Driver(backend)
+        driver._save_cfg(file_name, input_geometry, idxs)
 
 
     def build_structure(self, cut_molecule: bool = True) -> None:
