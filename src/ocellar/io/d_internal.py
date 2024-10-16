@@ -2,6 +2,7 @@
 
 import numpy
 import periodictable
+import shutil
 from pathlib import Path
 
 from ocellar.io.driver import Driver
@@ -82,6 +83,8 @@ class Dinternal(Driver):
             out_lines[2] = str(len(idxs)) + "\n"
             with open(file_name, "w") as f_out:
                 f_out.writelines(out_lines)
+
+        shutil.copy(input_geometry + "_types", file_name + "_types")
 
 
     @classmethod
