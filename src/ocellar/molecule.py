@@ -125,18 +125,18 @@ class Molecule:
 
 
     def save_cfg(self, file_name: str, input_geometry: str, idxs: list[int], backend: str = "internal") -> None:
-        """Save the molecule geometry in LAMMPS dump format.
+        """Save the molecule geometry in cfg format.
 
         Parameters
         ----------
         file_name : str
-            The name of the file to save the dump data.
+            The name of the file to save the cfg data.
         input_geometry : str or None
             Path to the input geometry file.
         idxs : list[int]
             Indices of atoms.
         backend : str, optional
-            The backend to use for saving dump (default is "internal").
+            The backend to use for saving cfg (default is "internal").
 
         """
         driver = io.Driver(backend)

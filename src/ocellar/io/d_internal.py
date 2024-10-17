@@ -57,7 +57,7 @@ class Dinternal(Driver):
 
     @classmethod
     def _save_cfg(cls, file_name: str, input_geometry: str, idxs: list[int]) -> None:
-        """Save the geometry in LAMMPS dump format.
+        """Save the geometry in cfg format.
 
         Parameters
         ----------
