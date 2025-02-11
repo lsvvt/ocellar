@@ -1,9 +1,6 @@
 """Module to handle molecule operations."""
 
 import numpy
-import periodictable
-import shutil
-from pathlib import Path
 
 from ocellar.io.driver import Driver
 
@@ -40,7 +37,7 @@ class Dinternal(Driver):
         # input_types = Path(input_geometry).stem
         atom_types = numpy.genfromtxt(input_geometry + "_types", dtype="str")
 
-        with open(input_geometry, "r") as f:
+        with open(input_geometry) as f:
             lines = f.readlines()
             elements = []
             coordinates = []
@@ -53,7 +50,6 @@ class Dinternal(Driver):
                     break
 
         return elements, numpy.array(coordinates)
-
 
     @classmethod
     def _save_cfg(cls, file_name: str, input_geometry: str, idxs: list[int]) -> None:
@@ -74,18 +70,23 @@ class Dinternal(Driver):
 
         """
         s_idxs = list(map(lambda x: str(x + 1), idxs))
-        
-        with open(input_geometry, "r") as f:
+
+        with open(input_geometry) as f:
             lines = f.readlines()
-            lines = lines[:lines.index("END_CFG\n")]
-            out_lines = [line for line in lines 
-                if not (len(line.split()) > 7 and line.split()[0] not in s_idxs and line.split()[1].isdigit())]
+            lines = lines[: lines.index("END_CFG\n")]
+            out_lines = [
+                line
+                for line in lines
+                if not (
+                    len(line.split()) > 7
+                    and line.split()[0] not in s_idxs
+                    and line.split()[1].isdigit()
+                )
+            ]
             out_lines[2] = str(len(idxs)) + "\n"
             with open(file_name, "w") as f_out:
                 f_out.writelines(out_lines)
-
-        shutil.copy(input_geometry + "_types", file_name + "_types")
-
+                f_out.write("END_CFG\n")
 
     @classmethod
     def _save_dump(cls, file_name: str, input_geometry: str, idxs: list[int]) -> None:
@@ -106,10 +107,19 @@ class Dinternal(Driver):
 
         """
         s_idxs = list(map(lambda x: str(x + 1), idxs))
-        
-        with open(input_geometry, "r") as f:
-            out_lines = [line for line in f 
-                if not (len(line.split()) > 5 and line.split()[0] not in s_idxs and line.split()[2].replace('.', '', 1).isdigit())]
-            out_lines[out_lines.index("ITEM: NUMBER OF ATOMS\n") + 1] = str(len(idxs)) + "\n"
+
+        with open(input_geometry) as f:
+            out_lines = [
+                line
+                for line in f
+                if not (
+                    len(line.split()) > 5
+                    and line.split()[0] not in s_idxs
+                    and line.split()[2].replace(".", "", 1).isdigit()
+                )
+            ]
+            out_lines[out_lines.index("ITEM: NUMBER OF ATOMS\n") + 1] = (
+                str(len(idxs)) + "\n"
+            )
             with open(file_name, "w") as f_out:
                 f_out.writelines(out_lines)

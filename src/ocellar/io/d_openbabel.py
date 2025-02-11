@@ -42,7 +42,6 @@ class DOpenbabel(Driver):
         coordinates = numpy.array([atom.coords for atom in mol.atoms])
         return elements, coordinates
 
-
     @classmethod
     def _build_bonds(cls, geometry: tuple[list, numpy.ndarray]) -> networkx.Graph:
         """Build a graph representation of molecular bonds using openbabel.
@@ -64,9 +63,7 @@ class DOpenbabel(Driver):
 
         for i, element in enumerate(geometry[0]):
             atom = obmol.NewAtom()
-            atom.SetAtomicNum(
-                periodictable.elements.symbol(element).number
-            )
+            atom.SetAtomicNum(periodictable.elements.symbol(element).number)
             x, y, z = geometry[1][i]
             atom.SetVector(x, y, z)
 
@@ -75,10 +72,13 @@ class DOpenbabel(Driver):
 
         molecule_graph = networkx.Graph()
         for bond in openbabel.OBMolBondIter(obmol):
-            molecule_graph.add_edge(bond.GetBeginAtomIdx() - 1, bond.GetEndAtomIdx() - 1, order=bond.GetBondOrder())
+            molecule_graph.add_edge(
+                bond.GetBeginAtomIdx() - 1,
+                bond.GetEndAtomIdx() - 1,
+                order=bond.GetBondOrder(),
+            )
 
         return molecule_graph
-    
 
     @classmethod
     def _save_pdb(cls, file_name: str, geometry: tuple[list, numpy.ndarray]) -> None:
@@ -102,11 +102,9 @@ class DOpenbabel(Driver):
 
         for i, element in enumerate(geometry[0]):
             atom = obmol.NewAtom()
-            atom.SetAtomicNum(
-                periodictable.elements.symbol(element).number
-            )
+            atom.SetAtomicNum(periodictable.elements.symbol(element).number)
             x, y, z = geometry[1][i]
             atom.SetVector(x, y, z)
-        
+
         mol = pybel.Molecule(obmol)
-        mol.write('pdb', file_name, overwrite=True)
+        mol.write("pdb", file_name, overwrite=True)

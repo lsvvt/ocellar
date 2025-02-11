@@ -38,11 +38,11 @@ class DCclib(Driver):
         """
         parsed_data = cclib.io.ccread(input_geometry)
         elements = [
-            periodictable.elements[atom_number].symbol for atom_number in parsed_data.atomnos
+            periodictable.elements[atom_number].symbol
+            for atom_number in parsed_data.atomnos
         ]
         coordinates = parsed_data.atomcoords[-1]
         return elements, coordinates
-
 
     @classmethod
     def _save_xyz(cls, file_name: str, geometry: tuple[list, numpy.ndarray]) -> None:
@@ -64,7 +64,9 @@ class DCclib(Driver):
         """
         attributes = {
             "natom": len(geometry[0]),
-            "atomnos": [periodictable.elements.symbol(atom).number for atom in geometry[0]],
+            "atomnos": [
+                periodictable.elements.symbol(atom).number for atom in geometry[0]
+            ],
             "atomcoords": [geometry[1]],
             "metadata": "",
         }

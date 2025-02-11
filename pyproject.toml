@@ -1,10 +1,11 @@
 [project]
 name = "ocellar"
-version = "0.1.0"
+version = "0.1.1"
 description = "Default template for PDM package"
 authors = [
     {name = "lsvvt", email = "losev.tim.v@gmail.com"},
     {name = "lsvvt", email = "lsvvt@github.com"},
+    {name = "IlyaRaven", email = "feniksaven@gmail.com"},
 ]
 dependencies = [
     "scipy>=1.13.1",
@@ -12,18 +13,13 @@ dependencies = [
     "cclib>=1.8.1",
     "networkx[default]>=3.3",
     "MDAnalysis>=2.7.0",
-    "openmm>=8.1.1",
 ]
-requires-python = ">=3.10"
+requires-python = "==3.10.*"
 readme = "README.md"
 license = {text = "MIT"}
 
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
-
 [tool.pdm]
-distribution = true
+distribution = false
 
 [tool.ruff]
 line-length = 88

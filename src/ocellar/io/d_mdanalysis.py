@@ -1,9 +1,7 @@
 """Module to handle molecule operations using MDAnalysis."""
 
-import MDAnalysis 
+import MDAnalysis
 import numpy
-import periodictable
-import openmm.app
 
 from ocellar.io.driver import Driver
 
@@ -37,17 +35,12 @@ class DMDAnalysis(Driver):
             - numpy.ndarray: An array of atomic coordinates.
 
         """
-        u = MDAnalysis.Universe(input_geometry, format='LAMMPSDUMP')
+        u = MDAnalysis.Universe(input_geometry, format="LAMMPSDUMP")
 
         coordinates = u.atoms.positions.astype(float)
+        types = u.atoms.types.astype(int)
+        atom_type_symbols = numpy.genfromtxt(input_geometry + "_types", dtype="str")
 
-        with open(input_geometry, "r") as f:
-            lines = f.readlines()
-            elements = [openmm.app.Element.getByMass(float(line.split()[2])).symbol for line in lines 
-                if len(line.split()) > 5 and line.split()[2].replace('.', '', 1).isdigit()]
-            # my code
-            # coordinates = [list(map(float, line.split()[3:6])) for line in lines 
-            #     if len(line.split()) > 5 and line.split()[2].replace('.', '', 1).isdigit()]
-        # coordinates = numpy.array(coordinates)
+        elements = [atom_type_symbols[i - 1] for i in types]
 
         return elements, coordinates
