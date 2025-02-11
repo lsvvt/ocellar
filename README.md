@@ -25,7 +25,7 @@ mol.build_structure() # Build structure (connected subgraphs) from graph
 
 # from dump
 mol = molecule.Molecule()
-mol.input_geometry = "tests/data/dump_el.dump"
+mol.input_geometry = "tests/data/dump_el.dump" # dump_el.dump_types must be present
 mol.build_geometry(backend="MDAnalysis") # Build geometry from input file with MDAnalysis backend
 mol.save_xyz("tmp.xyz")
 mol.build_graph()
@@ -44,7 +44,7 @@ new_mol.save_pdb("out.pdb")
 
 #from cfg
 mol = molecule.Molecule()
-mol.input_geometry = "butane_cut.cfg"
+mol.input_geometry = "butane_cut.cfg" # butane_cut.cfg_types must be present
 mol.build_geometry(backend="internal")
 
 mol.build_graph()
