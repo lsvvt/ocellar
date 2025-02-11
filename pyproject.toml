@@ -14,7 +14,7 @@ dependencies = [
     "networkx[default]>=3.3",
     "MDAnalysis>=2.7.0",
 ]
-requires-python = "==3.10.*"
+requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
 
