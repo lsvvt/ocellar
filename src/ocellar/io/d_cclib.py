@@ -68,6 +68,8 @@ class DCclib(Driver):
                 periodictable.elements.symbol(atom).number for atom in geometry[0]
             ],
             "atomcoords": [geometry[1]],
+            "charge": 0,
+            "mult": 1,
             "metadata": "",
         }
 
