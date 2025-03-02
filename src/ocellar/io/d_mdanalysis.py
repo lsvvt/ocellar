@@ -39,7 +39,7 @@ class DMDAnalysis(Driver):
 
         coordinates = u.atoms.positions.astype(float)
         types = u.atoms.types.astype(int)
-        atom_type_symbols = numpy.genfromtxt(input_geometry + "_types", dtype="str")
+        atom_type_symbols = numpy.genfromtxt("element_types", dtype="str")
 
         elements = [atom_type_symbols[i - 1] for i in types]
 

@@ -35,7 +35,7 @@ class Dinternal(Driver):
 
         """
         # input_types = Path(input_geometry).stem
-        atom_types = numpy.genfromtxt(input_geometry + "_types", dtype="str")
+        atom_types = numpy.genfromtxt("element_types", dtype="str")
 
         with open(input_geometry) as f:
             lines = f.readlines()
