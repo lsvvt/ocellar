@@ -19,13 +19,17 @@ class DMDAnalysis(Driver):
     backend = "MDAnalysis"
 
     @classmethod
-    def _build_geometry(cls, input_geometry: str) -> tuple[list, numpy.ndarray]:
+    def _build_geometry(
+        cls, input_geometry: str, element_types: list[str]
+    ) -> tuple[list, numpy.ndarray]:
         """Build the geometry from a LAMMPS dump file using MDAnalysis.
 
         Parameters
         ----------
         input_geometry : str
             Path to the input LAMMPS dump file.
+        element_types : list[str]
+            List of N element symbols corresponding to N atom types in cfg file.
 
         Returns
         -------
@@ -39,8 +43,6 @@ class DMDAnalysis(Driver):
 
         coordinates = u.atoms.positions.astype(float)
         types = u.atoms.types.astype(int)
-        atom_type_symbols = numpy.genfromtxt("element_types", dtype="str")
-
-        elements = [atom_type_symbols[i - 1] for i in types]
+        elements = [element_types[i - 1] for i in types]
 
         return elements, coordinates

@@ -34,6 +34,7 @@ class Molecule:
         """
         self.input_geometry = None
         self.geometry = None
+        self.element_types = None
         for key, val in kwargs.items():
             setattr(self, key, val)
 
@@ -55,7 +56,15 @@ class Molecule:
             raise ValueError("input_geometry is not defined")
 
         driver = io.Driver(backend)
-        self.geometry = driver._build_geometry(self.input_geometry)
+        if backend == "cclib":
+            self.geometry = driver._build_geometry(self.input_geometry)
+        else:
+            if self.element_types is None:
+                raise ValueError("element_types is not defined")
+
+            self.geometry = driver._build_geometry(
+                self.input_geometry, self.element_types
+            )
 
     def build_graph(self, backend: str = "openbabel") -> None:
         """Build the graph representation of the molecule.

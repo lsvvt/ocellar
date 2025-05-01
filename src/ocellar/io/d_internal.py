@@ -18,13 +18,17 @@ class Dinternal(Driver):
     backend = "internal"
 
     @classmethod
-    def _build_geometry(cls, input_geometry: str) -> tuple[list, numpy.ndarray]:
+    def _build_geometry(
+        cls, input_geometry: str, element_types: list[str]
+    ) -> tuple[list, numpy.ndarray]:
         """Build the geometry from a cfg file.
 
         Parameters
         ----------
         input_geometry : str
             Path to the input cfg file.
+        element_types : list[str]
+            List of N element symbols corresponding to N atom types in cfg file.
 
         Returns
         -------
@@ -34,9 +38,6 @@ class Dinternal(Driver):
             - numpy.ndarray: An array of atomic coordinates.
 
         """
-        # input_types = Path(input_geometry).stem
-        atom_types = numpy.genfromtxt("element_types", dtype="str")
-
         with open(input_geometry) as f:
             lines = f.readlines()
             elements = []
@@ -44,7 +45,7 @@ class Dinternal(Driver):
 
             for line in lines:
                 if len(line.split()) > 7 and line.split()[1].isdigit():
-                    elements.append(atom_types[int(line.split()[1])])
+                    elements.append(element_types[int(line.split()[1])])
                     coordinates.append(list(map(float, line.split()[2:5])))
                 elif "Energy" in line:
                     break
