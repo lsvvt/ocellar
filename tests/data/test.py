@@ -2,6 +2,7 @@ from ocellar import molecule
 
 mol = molecule.Molecule()
 mol.input_geometry = "dump_el.dump"
+mol.element_types = ["C", "H"]
 mol.build_geometry(
     backend="MDAnalysis"
 )  # Build geometry from input file with MDAnalysis backend

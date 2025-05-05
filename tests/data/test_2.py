@@ -2,6 +2,7 @@ from ocellar import molecule
 
 mol = molecule.Molecule()
 mol.input_geometry = "butane_cut.cfg"
+mol.element_types = ["C", "C", "H"]
 mol.build_geometry(backend="internal")
 
 mol.build_graph()
