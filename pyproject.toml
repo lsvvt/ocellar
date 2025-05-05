@@ -3,9 +3,9 @@ name = "ocellar"
 version = "0.1.1"
 description = "Default template for PDM package"
 authors = [
-    {name = "lsvvt", email = "losev.tim.v@gmail.com"},
-    {name = "lsvvt", email = "lsvvt@github.com"},
-    {name = "IlyaRaven", email = "feniksaven@gmail.com"},
+    { name = "lsvvt", email = "losev.tim.v@gmail.com" },
+    { name = "lsvvt", email = "lsvvt@github.com" },
+    { name = "IlyaRaven", email = "feniksaven@gmail.com" },
 ]
 dependencies = [
     "scipy>=1.13.1",
@@ -16,7 +16,7 @@ dependencies = [
 ]
 requires-python = ">=3.10"
 readme = "README.md"
-license = {text = "MIT"}
+license = { text = "MIT" }
 
 [tool.pdm]
 distribution = false
@@ -40,3 +40,19 @@ docstring-code-line-length = "dynamic"
 max-line-length = 88
 extend-ignore = ["WPS306", "WPS305", "DAR101", "DAR201"]
 inline-quotes = "double"
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+ocellar = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+scipy = ">=1.13.1,<2"
+openbabel = ">=3.1.1,<4"
+networkx = ">=3.3,<4"
+mdanalysis = ">=2.7.0,<3"
+cclib = ">=1.8.1,<2"
