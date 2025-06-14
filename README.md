@@ -1,60 +1,134 @@
-# ocellar
-tools: pdm, ruff, wemake-python-styleguide, pflake8
+# Ocellar
 
-## installation
-1) Install pdm https://pdm-project.org/en/latest
-2) 
+A Python library for extracting spherical molecular environments with respect to topology from different formats: .xyz, LAMMPS .dump, MLIP .cfg.
+
+## Installation
+
+The project uses PDM for dependency management. Follow these steps to set up your development environment:
+
+1. Install PDM from the official documentation at https://pdm-project.org/en/latest
+2. Set up the project environment:
 ```bash
 pdm install
 . .venv/bin/activate
 ```
 
-## usage
+## Dependencies
+
+The library integrates with several computational chemistry and data analysis packages:
+- **scipy**: Scientific computing functions
+- **openbabel-wheel**: Chemical file format handling and molecular graph construction
+- **cclib**: Quantum chemistry output file parsing
+- **networkx**: Graph-based molecular structure representation
+- **MDAnalysis**: Molecular dynamics trajectory analysis
+
+## Usage Examples
+
+### Working with XYZ Files
+
+Load molecular geometry from standard XYZ format files and perform basic operations:
+
 ```python
 from ocellar import molecule
 
+# Initialize molecule and load geometry
+mol = molecule.Molecule()
+mol.input_geometry = "tests/data/traj.xyz"
+mol.build_geometry()
 
-# from xyz
-mol = molecule.Molecule() # Create Molecule object mol
-mol.input_geometry = "tests/data/traj.xyz" # Set input geometry file
-mol.build_geometry() # Build geometry from input file
-mol.save_xyz("tmp.xyz") # Save xyz
-mol.build_graph() # Build graph from geometry
-mol.build_structure() # Build structure (connected subgraphs) from graph
+# Save processed geometry
+mol.save_xyz("output.xyz")
 
+# Build molecular graph and structure
+mol.build_graph()
+mol.build_structure()
+```
 
-# from dump
+### Processing LAMMPS Dump Files
+
+Handle molecular dynamics simulation output with element type mapping:
+
+```python
 mol = molecule.Molecule()
 mol.input_geometry = "tests/data/dump_el.dump"
-mol.element_types = ["C", "H"] # Set element symbols according to types in dump
-mol.build_geometry(backend="MDAnalysis") # Build geometry from input file with MDAnalysis backend
-mol.save_xyz("tmp.xyz")
+mol.element_types = ["C", "H"]  # Map atom types to element symbols
+
+# Use MDAnalysis backend for dump file processing
+mol.build_geometry(backend="MDAnalysis")
+mol.save_xyz("converted.xyz")
+
+# Analyze molecular connectivity
 mol.build_graph()
-mol.build_structure(cut_molecule = False) # without cutting single bonds
+mol.build_structure(cut_molecule=False)  # Preserve molecules with parts located inside the sphere
 
-new_mol, idxs = mol.select(mol.select_r([1.09220004e+0,  8.92530024e-01,  1.03007996e+00], 0.1)) # 1. Select atom idxs with sphere center and radius 2. Build new Molecule (with hydrogenes) and new idxs from idxs
+# Select atoms within spatial region
+center_point = [1.0922, 0.89253, 1.03008]
+radius = 2
+selected_indices = mol.select_r(center_point, radius)
 
-mol.save_dump("out.dump", mol.input_geometry, idxs) # Save dump file using original dump and idxs
+# Extract molecular fragment with hydrogen capping
+new_mol, atom_indices = mol.select(selected_indices)
 
-# Build and save new mol
+# Save extracted fragment
+mol.save_dump("fragment.dump", mol.input_geometry, atom_indices)
 new_mol.build_graph()
 new_mol.build_structure()
+new_mol.save_xyz("fragment.xyz")
+new_mol.save_pdb("fragment.pdb")
+```
 
-new_mol.save_xyz("out.xyz")
-new_mol.save_pdb("out.pdb")
+### Working with CFG Files
 
-#from cfg
+Process MLIP configuration files with custom element type definitions:
+
+```python
 mol = molecule.Molecule()
 mol.input_geometry = "tests/data/butane_cut.cfg"
-mol.element_types = ["C", "C", "H"] # Set element symbols according to types in cfg
+mol.element_types = ["C", "C", "H"]  # Define element types for CFG format
+
+# Use internal parser for CFG files
 mol.build_geometry(backend="internal")
-
 mol.build_graph()
-mol.build_structure(cut_molecule = False)
-new_mol, idxs = mol.select(mol.select_r([44.1066, 57.6431, 52.0], 10))
+mol.build_structure(cut_molecule=False)
 
-mol.save_cfg("out.cfg", mol.input_geometry, idxs) # Save dump file using original dump and idxs
-new_mol.save_xyz("out.xyz")
-new_mol.save_pdb("out.pdb")
+# Perform spatial selection
+selection_center = [44.1066, 57.6431, 52.0]
+selection_radius = 10.0
+selected_atoms = mol.select_r(selection_center, selection_radius)
+new_mol, indices = mol.select(selected_atoms)
 
+# Export results
+mol.save_cfg("output.cfg", mol.input_geometry, indices)
+new_mol.save_xyz("extracted.xyz")
+new_mol.save_pdb("extracted.pdb")
 ```
+
+## Backend Options
+
+The library supports multiple backends for different operations:
+
+- **cclib**: Default backend for standard quantum chemistry file formats (XYZ, Gaussian, etc.)
+- **openbabel**: Chemical structure manipulation and PDB file handling
+- **MDAnalysis**: Molecular dynamics trajectory processing
+- **internal**: Custom parsers for specialized formats (CFG, LAMMPS dump)
+
+## Development Tools
+
+The project employs modern Python development practices:
+- **pdm**: Project and dependency management
+- **ruff**: Code formatting and linting
+- **wemake-python-styleguide**: Code quality enforcement
+- **pflake8**: Additional style checking
+
+## File Format Support
+
+Ocellar handles various molecular file formats commonly used in computational chemistry and materials science:
+- XYZ: Standard molecular geometry format
+- PDB: Protein Data Bank format
+- CFG: MLIP configuration files
+- LAMMPS dump: Molecular dynamics simulation output
+- Various quantum chemistry output formats (via cclib)
+
+## License
+
+This project is distributed under the MIT License.
