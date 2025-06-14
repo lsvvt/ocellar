@@ -72,7 +72,7 @@ new_mol, atom_indices = mol.select(selected_indices)
 # Save extracted fragment
 mol.save_dump("fragment.dump", mol.input_geometry, atom_indices)
 new_mol.build_graph()
-new_mol.build_structure()
+new_mol.build_structure(cut_molecule=True)
 new_mol.save_xyz("fragment.xyz")
 new_mol.save_pdb("fragment.pdb")
 ```

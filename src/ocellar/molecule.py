@@ -20,6 +20,10 @@ class Molecule:
         Graph representation of the molecular structure.
     subgraphs : list or None
         list of connected components in the molecular graph.
+    element_types : list[str] or None
+        Element symbols corresponding to atom types in certain file formats
+        (CFG, LAMMPS dump). Required when atoms are specified by numeric
+        type identifiers rather than element symbols.
 
     """
 
@@ -39,17 +43,25 @@ class Molecule:
             setattr(self, key, val)
 
     def build_geometry(self, backend: str = "cclib") -> None:
-        """Build the geometry of the molecule.
+        """Build molecular geometry from input file.
+
+        Reads atomic coordinates and element information from the specified
+        input geometry file using the selected computational backend. The
+        method populates the geometry attribute with processed molecular data.
 
         Parameters
         ----------
         backend : str, optional
-            The backend to use for building the geometry (default is "cclib").
+            Computational backend for file processing. Options include:
+            - "cclib": Quantum chemistry formats - .xyz (default)
+            - "MDAnalysis": Molecular dynamics trajectories - .dump
+            - "internal": Custom MLIP .cfg and LAMMPS .dump parsers
 
         Raises
         ------
         ValueError
-            If input_geometry is not defined.
+            If input_geometry is not defined or if element_types is required
+            but not provided for the selected backend.
 
         """
         if self.input_geometry is None:
@@ -157,8 +169,17 @@ class Molecule:
         driver = io.Driver(backend)
         driver._save_cfg(file_name, input_geometry, idxs)
 
-    def build_structure(self, cut_molecule: bool = True) -> None:
-        """Build the substructure of the molecule by identifying connected components."""
+    def build_structure(self, *, cut_molecule: bool) -> None:
+        """Build the substructure of the molecule by identifying connected components.
+
+        Parameters
+        ----------
+        cut_molecule : bool
+            Whether to break single bonds between heavy atoms.
+            When True, molecules are fragmented at single bonds connecting
+            atoms with multiple neighbors. When False, all bonds are preserved.
+
+        """
         if self.graph is None:
             raise ValueError("Graph is not built. Call build_graph() first.")
 
@@ -177,13 +198,13 @@ class Molecule:
 
         self.subgraphs = [c for c in networkx.connected_components(cutted_graph)]
 
-    def select_r(self, x: list[float], r: float) -> list[int]:
+    def select_r(self, center: list[float], r: float) -> list[int]:
         """Select atoms within a given radius of a point.
 
         Parameters
         ----------
-        x : list[float]
-            The center point coordinates.
+        center : list[float]
+            The center point coordinates [x, y, z].
         r : float
             The radius within which to select atoms.
 
@@ -197,7 +218,7 @@ class Molecule:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
 
         tree = cKDTree(self.geometry[1])
-        idx = tree.query_ball_point(x, r)
+        idx = tree.query_ball_point(center, r)
         return idx
 
     def select(self, idxs: list[int]) -> tuple["Molecule", list[int]]:
@@ -214,7 +235,8 @@ class Molecule:
             A new Molecule object containing the selected atoms and necessary hydrogens.
         tuple
             A tuple containing:
-            - Molecule: A new Molecule object containing the selected atoms and necessary hydrogens.
+            - Molecule: A new Molecule object containing the selected atoms
+            and necessary hydrogens.
             - list[int]: An array of selected atoms index.
 
         """
@@ -225,34 +247,39 @@ class Molecule:
 
         if self.geometry is None or self.graph is None or self.subgraphs is None:
             raise ValueError(
-                "Molecule structure is not fully built. Call build_geometry(), build_graph(), and build_structure() first."
+                "Molecule structure is not fully built."
+                "Call build_geometry(), build_graph(), and build_structure() first."
             )
 
-        selected_n = []
-        for graph in self.subgraphs:
-            if any(idx in idxs for idx in graph):
-                selected_n += list(graph)
+        # Include complete molecular fragments containing selected atoms
+        selected_atoms = []
+        for subgraph in self.subgraphs:
+            if any(idx in idxs for idx in subgraph):
+                selected_atoms.extend(list(subgraph))
 
-        new_at = []
-        for atom in selected_n:
+        new_hydrogens = []
+        for atom in selected_atoms:
             for neighbor in self.graph.neighbors(atom):
-                if neighbor not in selected_n:
-                    new_at.append(
-                        norm(self.geometry[1][neighbor] - self.geometry[1][atom]) * 1.09
-                        + self.geometry[1][atom]
+                if neighbor not in selected_atoms:
+                    # Add hydrogen at standard C-H distance along bond direction
+                    bond_vector = self.geometry[1][neighbor] - self.geometry[1][atom]
+                    hydrogen_position = (
+                        norm(bond_vector) * 1.09 + self.geometry[1][atom]
                     )
+                    new_hydrogens.append(hydrogen_position)
 
         new_molecule = Molecule()
+        selected_atoms.sort()
 
-        selected_n.sort()
         new_molecule.geometry = (
-            [self.geometry[0][i] for i in selected_n],
-            self.geometry[1][selected_n],
+            [self.geometry[0][i] for i in selected_atoms],
+            self.geometry[1][selected_atoms],
         )
-        if len(new_at) > 0:
+
+        if len(new_hydrogens) > 0:
             new_molecule.geometry = (
-                new_molecule.geometry[0] + ["H"] * len(new_at),
-                np.append(new_molecule.geometry[1], np.array(new_at), axis=0),
+                new_molecule.geometry[0] + ["H"] * len(new_hydrogens),
+                np.append(new_molecule.geometry[1], np.array(new_hydrogens), axis=0),
             )
 
-        return new_molecule, selected_n
+        return new_molecule, selected_atoms
