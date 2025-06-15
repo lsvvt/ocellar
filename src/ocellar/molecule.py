@@ -68,7 +68,7 @@ class Molecule:
             raise ValueError("input_geometry is not defined")
 
         driver = io.Driver(backend)
-        if backend == "cclib":
+        if backend in ["cclib", "openbabel"]:
             self.geometry = driver._build_geometry(self.input_geometry)
         else:
             if self.element_types is None:
