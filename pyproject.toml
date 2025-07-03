@@ -19,11 +19,12 @@ readme = "README.md"
 license = {text = "MIT"}
 
 [tool.pdm]
-distribution = false
+distribution = true
 
 [tool.ruff]
 line-length = 88
 target-version = "py312"
+extend-exclude = ["tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "D", "I", "N", "UP", "ANN", "S", "BLE", "FBT", "B"]
