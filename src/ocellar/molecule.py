@@ -235,9 +235,7 @@ class Molecule:
 
         Returns
         -------
-        Molecule
-            A new Molecule object containing the selected atoms and necessary hydrogens.
-        tuple
+        tuple: [Molecule, list[int]]
             A tuple containing:
             - Molecule: A new Molecule object containing the selected atoms
             and necessary hydrogens.
