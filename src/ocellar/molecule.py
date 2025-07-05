@@ -1,8 +1,8 @@
 import networkx
 import numpy as np
-from scipy.spatial import cKDTree
 
 from ocellar import io
+from ocellar.utils.pkdtree import PeriodicKDTree
 
 
 class Molecule:
@@ -39,6 +39,7 @@ class Molecule:
         self.input_geometry = None
         self.geometry = None
         self.element_types = None
+        self.bounds = None
         for key, val in kwargs.items():
             setattr(self, key, val)
 
@@ -60,8 +61,10 @@ class Molecule:
         Raises
         ------
         ValueError
-            If input_geometry is not defined or if element_types is required
-            but not provided for the selected backend.
+            If `input_geometry` is not defined or
+            if `element_types` is required but not provided
+            for the selected backend
+            or if `bounds` is required but not provided.
 
         """
         if self.input_geometry is None:
@@ -73,7 +76,8 @@ class Molecule:
         else:
             if self.element_types is None:
                 raise ValueError("element_types is not defined")
-
+            if self.bounds is None:
+                raise ValueError("bounds is not defined")
             self.geometry = driver._build_geometry(
                 self.input_geometry, self.element_types
             )
@@ -217,7 +221,7 @@ class Molecule:
         if self.geometry is None:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
 
-        tree = cKDTree(self.geometry[1])
+        tree = PeriodicKDTree(bounds=self.bounds, data=self.geometry[1])
         idx = tree.query_ball_point(center, r)
         return idx
 
