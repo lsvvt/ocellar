@@ -1,3 +1,5 @@
+"""Main ocellar package module, containing Molecule class."""
+
 from pathlib import Path
 
 import networkx
