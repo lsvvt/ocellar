@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import networkx
 import numpy as np
 
@@ -24,24 +26,38 @@ class Molecule:
         Element symbols corresponding to atom types in certain file formats
         (CFG, LAMMPS dump). Required when atoms are specified by numeric
         type identifiers rather than element symbols.
+    bounds : list[float] or None
+        List of unit cell dimensions in format `[L_x, L_y, L_z]`.
 
     """
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(
+        self,
+        input_geometry: str | Path | None = None,
+        element_types: np.typing.ArrayLike | None = None,
+        bounds: np.typing.ArrayLike | None = None,
+    ) -> None:
         """Initialize the Molecule object.
 
         Parameters
         ----------
-        **kwargs
-            Arbitrary keyword arguments to set as attributes.
+        input_geometry : str or Path or None
+            Path to the input geometry file.
+        element_types : np.typing.ArrayLike or None
+            Element symbols corresponding to atom types in certain file formats
+            (CFG, LAMMPS dump). Required when atoms are specified by numeric
+            type identifiers rather than element symbols.
+        bounds : np.typing.ArrayLike or None
+            List of unit cell dimensions in format `[L_x, L_y, L_z]`.
 
         """
-        self.input_geometry = None
+        self.input_geometry = input_geometry
+        self.element_types = element_types
+        if bounds:
+            self.bounds = np.array(bounds)
         self.geometry = None
-        self.element_types = None
-        self.bounds = None
-        for key, val in kwargs.items():
-            setattr(self, key, val)
+        self.graph = None
+        self.subgraphs = None
 
     def build_geometry(self, backend: str = "cclib") -> None:
         """Build molecular geometry from input file.
@@ -243,8 +259,20 @@ class Molecule:
 
         """
 
-        def norm(xyz) -> np.ndarray:
-            """Normalize a vector."""
+        def norm(xyz: np.typing.ArrayLike) -> np.ndarray:
+            """Normalize a vector.
+
+            Parameters
+            ----------
+            xyz : np.typing.ArrayLike
+                Vector coordinates
+
+            Returns
+            -------
+            np.ndarray
+                Normalized coordinates of given vector
+
+            """
             return np.array(xyz) / np.linalg.norm(xyz)
 
         if self.geometry is None or self.graph is None or self.subgraphs is None:
