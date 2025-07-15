@@ -221,7 +221,7 @@ class Molecule:
         idx = tree.query_ball_point(center, r)
         return idx
 
-    def select(self, idxs: list[int]) -> tuple["Molecule", list[int]]:
+    def select(self, selected_atoms) -> "Molecule":
         """Select a subset of the molecule based on atom indices.
 
         Parameters
@@ -251,12 +251,6 @@ class Molecule:
                 "Call build_geometry(), build_graph(), and build_structure() first."
             )
 
-        # Include complete molecular fragments containing selected atoms
-        selected_atoms = []
-        for subgraph in self.subgraphs:
-            if any(idx in idxs for idx in subgraph):
-                selected_atoms.extend(list(subgraph))
-
         new_hydrogens = []
         for atom in selected_atoms:
             for neighbor in self.graph.neighbors(atom):
@@ -282,4 +276,27 @@ class Molecule:
                 np.append(new_molecule.geometry[1], np.array(new_hydrogens), axis=0),
             )
 
-        return new_molecule, selected_atoms
+        return new_molecule
+    
+    def expand_selection(self, idxs: list[int]):
+        if self.geometry is None or self.graph is None or self.subgraphs is None:
+            raise ValueError(
+                "Molecule structure is not fully built."
+                "Call build_geometry(), build_graph(), and build_structure() first."
+            )
+
+        # Include complete molecular fragments containing selected atoms
+        selected_atoms = []
+        for subgraph in self.subgraphs:
+            if any(idx in idxs for idx in subgraph):
+                selected_atoms.extend(list(subgraph))
+
+        electronegative_atoms = {"O", "N", "S", "P"}        
+
+        for atom in selected_atoms:
+            for neighbor in self.graph.neighbors(atom):
+                if self.geometry[0][atom] in electronegative_atoms:
+                    if neighbor not in selected_atoms:
+                        selected_atoms.append(neighbor)
+
+        return selected_atoms 
