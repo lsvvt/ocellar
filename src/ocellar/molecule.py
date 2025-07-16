@@ -297,14 +297,14 @@ class Molecule:
             if any(idx in idxs for idx in subgraph):
                 selected_atoms.extend(list(subgraph))
 
-        electronegative_atoms = {"O", "S", "P"}
+        electronegative_atoms = {"O", "S", "N", "P"}
         functional_group_atoms = {'F', "O", "Br", "Cl", "I"}        
 
         for atom in selected_atoms:
             for neighbor in self.graph.neighbors(atom):
                 if self.geometry[0][neighbor] in electronegative_atoms and neighbor not in selected_atoms:
                     selected_atoms.append(neighbor)
-                elif self.geometry[0][neighbor] == 'C' or self.geometry[0][neighbor] == "N":
+                if self.geometry[0][neighbor] in {"C", "N"}:
                     if any(self.geometry[0][c_n_neighbor] in functional_group_atoms for c_n_neighbor in self.graph.neighbors(neighbor)):
                         for next_neighbor in self.graph.neighbors(neighbor):
                             if next_neighbor not in selected_atoms:
