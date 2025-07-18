@@ -251,7 +251,7 @@ class Molecule:
             tree = KDTree(data=self.geometry[1])
         else:
             tree = PeriodicKDTree(bounds=self.bounds, data=self.geometry[1])
-        idx = tree.query_ball_point(center, r)
+        idx = tree.query_ball_point(center, r, workers=-1)
         return idx
 
     def select(self, idxs: list[int]) -> tuple["Molecule", list[int]]:
