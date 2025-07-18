@@ -45,6 +45,169 @@ def _gen_relevant_images(x, bounds, distance_upper_bound):
 
     return xs_to_try
 
+def gen_relevant_images_for_triclinic_cell(x, bounds, distance_upper_bound):
+    lx = bounds[1] - bounds[0]
+    ly = bounds[3] - bounds[2]
+    lz = bounds[5] - bounds[4]
+    alpha = bounds[6]
+    beta = bounds[7]
+    gamma = bounds[8]
+
+    box_matrix = np.zeros((3, 3))
+    box_matrix[0, 0] = lx
+    if alpha == 90.0:
+        cos_alpha = 0.0
+    else:
+        cos_alpha = np.cos(np.radians(alpha))
+    if beta == 90.0:
+        cos_beta = 0.0
+    else:
+        cos_beta = np.cos(np.radians(beta))
+    if gamma == 90.0:
+        cos_gamma = 0.0
+        sin_gamma = 1.0
+    else:
+        gamma = np.radians(gamma)
+        cos_gamma = np.cos(gamma)
+        sin_gamma = np.sin(gamma)
+    box_matrix[1, 0] = ly * cos_gamma
+    box_matrix[1, 1] = ly * sin_gamma
+    box_matrix[2, 0] = lz * cos_beta
+    box_matrix[2, 1] = lz * (cos_alpha - cos_beta * cos_gamma) / sin_gamma
+    box_matrix[2, 2] = np.sqrt(
+        lz * lz - box_matrix[2, 0] ** 2 - box_matrix[2, 1] ** 2
+    )
+
+    real_x = x - np.where(bounds > 0.0, np.floor(x / bounds) * bounds, 0.0)
+    m = len(x)
+
+    shiftX = np.zeros(3)
+    shiftY = np.zeros(3)
+    shiftZ = np.zeros(3)
+    end = np.zeros(3)
+
+    for i in range(3):
+        shiftX[i] = box_matrix[0][i]
+        shiftY[i] = box_matrix[1][i]
+        shiftZ[i] = box_matrix[2][i]
+        end[i] = box_matrix[0][i] + box_matrix[1][i] + box_matrix[2][i]
+    # Calculate reciprocal vectors
+    reciprocal = np.zeros((3, 3))
+    reciprocal[0][0] = np.cross(box_matrix[1][0], box_matrix[2][0])
+    reciprocal[1][0] = np.cross(box_matrix[2][0], box_matrix[0][0])
+    reciprocal[2][0] = np.cross(box_matrix[0][0], box_matrix[1][0])
+
+    # Normalize
+    for i in range(3):
+        norm = np.linalg.norm(reciprocal[i][0])
+        for j in range(3):
+            reciprocal[i][j] = reciprocal[i][j]/norm
+
+    real_x = x - np.where(bounds > 0.0, np.floor(x / bounds) * bounds, 0.0)
+    m = len(x)
+
+    lo_x = false
+    hi_x = false
+    lo_y = false
+    hi_y = false
+    lo_z = false
+    hi_z = false
+
+    xs_to_try = [real_x]
+    coord = np.zeros(3)
+    for i in range(m):
+        coord[i] = real_x[i]
+        other = end - coord
+
+        # identify the condition 
+        lo_x = np.dot(coord, reciprocal[0][0]) <= distance_upper_bound
+        hi_x = np.dot(other, reciprocal[0][0]) <= distance_upper_bound
+        lo_y = np.dot(coord, reciprocal[1][0]) <= distance_upper_bound
+        hi_y = np.dot(other, reciprocal[1][0]) <= distance_upper_bound
+        lo_z = np.dot(coord, reciprocal[2][0]) <= distance_upper_bound
+        hi_z = np.dot(other, reciprocal[2][0]) <= distance_upper_bound
+
+        if lo_x:
+            xs_to_try.append(coord + shiftX)
+
+            if lo_y:
+                xs_to_try.append(coord + shiftX + shiftY)
+            
+                if lo_z:
+                    xs_to_try.append(coord + shiftX + shiftY +shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord + shiftX + shiftY - shiftZ)
+
+            elif hi_y:
+                xs_to_try.append(coord + shiftX - shiftY)
+
+                if lo_z:
+                    xs_to_try.append(coord + shiftX - shiftY + shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord + shiftX - shiftY - shiftZ)
+
+            if lo_z:
+                xs_to_try.append(coord + shiftX + shiftZ)
+
+            elif hi_z:
+                xs_to_try.append(coord + shiftX - shiftZ)
+
+        elif hi_x:
+            xs_to_try.append(coord - shiftX)
+
+            if lo_y:
+                xs_to_try.append(coord - shiftX + shiftY)
+            
+                if lo_z:
+                    xs_to_try.append(coord - shiftX + shiftY +shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord - shiftX + shiftY - shiftZ)
+
+            elif hi_y:
+                xs_to_try.append(coord - shiftX - shiftY)
+
+                if lo_z:
+                    xs_to_try.append(coord - shiftX - shiftY + shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord - shiftX - shiftY - shiftZ)
+
+            if lo_z:
+                xs_to_try.append(coord - shiftX + shiftZ)
+
+            elif hi_z:
+                xs_to_try.append(coord - shiftX - shiftZ)
+
+        if lo_y:
+            xs_to_try.append(coord + shiftY)
+            
+            if lo_z:
+                xs_to_try.append(coord + shiftY + shiftZ)
+
+            elif hi_z:
+                xs_to_try(coord + shiftY - shiftZ)
+
+        elif hi_y:
+            xs_to_try.append(coord - shiftY)
+
+            if lo_z:
+                xs_to_try.append(coord - shiftY + shiftZ)
+
+            elif hi_z:
+                xs_to_try.append(coord - shiftY - shiftZ)
+
+        if lo_z:
+            xs_to_try.append(coord[j] + shiftZ[j])
+
+        elif hi_z:
+            xs_to_try.append(coord[j] - shiftZ[j])
+
+    return xs_to_try
+
+
 
 class PeriodicKDTree(KDTree):
     """Cython kd-tree for quick nearest-neighbor lookup with periodic boundaries.
