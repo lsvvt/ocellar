@@ -274,7 +274,7 @@ class PeriodicKDTree(KDTree):
             results.extend(super().query_ball_point(real_x, r, p, eps, workers=workers))
         return results
 
-    def query_ball_point(self, x, r, p=2.0, eps=0):
+    def query_ball_point(self, x, r, p=2.0, eps=0, workers=1):
         """Find all points within distance r of point(s) x.
 
         :arg x: array_like, shape tuple + (self.m,)
@@ -303,12 +303,12 @@ class PeriodicKDTree(KDTree):
                 "%d-dimensional KDTree" % (x.shape[-1], self.m)
             )
         if len(x.shape) == 1:
-            return self.__query_ball_point(x, r, p, eps)
+            return self.__query_ball_point(x, r, p, eps, workers)
         else:
             retshape = x.shape[:-1]
             result = np.empty(retshape, dtype=np.object)
             for c in np.ndindex(retshape):
-                result[c] = self.__query_ball_point(x[c], r, p, eps)
+                result[c] = self.__query_ball_point(x[c], r, p, eps, workers)
             return result
 
     def query_ball_tree(self, other, r, p=2.0, eps=0):
