@@ -1,5 +1,6 @@
 """Main ocellar package module, containing Molecule class."""
 
+import warnings
 from pathlib import Path
 
 import networkx
@@ -98,7 +99,10 @@ class Molecule:
             if self.element_types is None:
                 raise ValueError("element_types is not defined")
             if self.bounds is None:
-                raise ValueError("bounds is not defined")
+                warnings.warn(
+                    "Cell bounds are not defined, extracting will be non-periodic",
+                    stacklevel=2,
+                )
             self.geometry = driver._build_geometry(
                 self.input_geometry, self.element_types
             )
