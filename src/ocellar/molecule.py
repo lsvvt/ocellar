@@ -5,6 +5,7 @@ from pathlib import Path
 
 import networkx
 import numpy as np
+from scipy.spatial import KDTree
 
 from ocellar import io
 from ocellar.utils.pkdtree import PeriodicKDTree
@@ -246,7 +247,10 @@ class Molecule:
         if self.geometry is None:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
         center = np.array(center)
-        tree = PeriodicKDTree(bounds=self.bounds, data=self.geometry[1])
+        if self.bounds is None:
+            tree = KDTree(data=self.geometry[1])
+        else:
+            tree = PeriodicKDTree(bounds=self.bounds, data=self.geometry[1])
         idx = tree.query_ball_point(center, r)
         return idx
 

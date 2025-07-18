@@ -112,7 +112,7 @@ class PeriodicKDTree(KDTree):
     # Ideally, KDTree and cKDTree would expose identical query and __query
     # interfaces.  But they don't, and cKDTree.__query is also inaccessible
     # from Python.  We do our best here to cope.
-    def __query(self, x, k=1, eps=0, p=2, distance_upper_bound=np.inf):
+    def __query(self, x, k=1, eps=0, p=2, distance_upper_bound=np.inf, workers=1):
         # This is the internal query method, which guarantees that x
         # is a single point, not an array of points
         #
@@ -127,7 +127,9 @@ class PeriodicKDTree(KDTree):
         # Run queries over all relevant images of x
         hits_list = []
         for real_x in _gen_relevant_images(x, self.bounds, distance_upper_bound):
-            d, i = super().query(real_x, k, eps, p, distance_upper_bound, workers=-1)
+            d, i = super().query(
+                real_x, k, eps, p, distance_upper_bound, workers=workers
+            )
             if k > 1:
                 hits_list.append(list(zip(d, i, strict=True)))
             else:
@@ -259,7 +261,7 @@ class PeriodicKDTree(KDTree):
     # Ideally, KDTree and cKDTree would expose identical __query_ball_point
     # interfaces.  But they don't, and cKDTree.__query_ball_point is also
     # inaccessible from Python.  We do our best here to cope.
-    def __query_ball_point(self, x, r, p=2.0, eps=0):
+    def __query_ball_point(self, x, r, p=2.0, eps=0, workers=1):
         # This is the internal query method, which guarantees that x
         # is a single point, not an array of points
 
@@ -269,7 +271,7 @@ class PeriodicKDTree(KDTree):
         # Run queries over all relevant images of x
         results = []
         for real_x in _gen_relevant_images(x, self.bounds, r):
-            results.extend(super().query_ball_point(real_x, r, p, eps, workers=-1))
+            results.extend(super().query_ball_point(real_x, r, p, eps, workers=workers))
         return results
 
     def query_ball_point(self, x, r, p=2.0, eps=0):
