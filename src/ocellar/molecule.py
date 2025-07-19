@@ -61,6 +61,8 @@ class Molecule:
         self.element_types = element_types
         if bounds is not None:
             self.bounds = np.array(bounds)
+        else:
+            self.bounds = None
         self.geometry = None
         self.graph = None
         self.subgraphs = None
@@ -121,7 +123,7 @@ class Molecule:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
 
         driver = io.Driver(backend)
-        self.graph = driver._build_bonds(self)
+        self.graph: networkx.Graph = driver._build_bonds(self)
 
     def save_xyz(self, file_name: str, backend: str = "cclib") -> None:
         """Save the molecule geometry in XYZ format.
