@@ -94,7 +94,7 @@ def build_matrix_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
     return bounds_matrix
 
 
-def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix: np.ndarray, distance_upper_bound: float) -> np.ndarray:
+def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix: np.ndarray, distance_upper_bound: float = np.inf) -> np.ndarray:
     """Produce the mirror images of x coordinates.
 
     Parameters
@@ -103,12 +103,9 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
         An array of points.
     bounds_matrix : np.ndarray
         A matrix representation of the cell bounds.
-    distance_upper_bound : nonnegative float, optional
-        Return only neighbors within this distance. This is used to prune
-        tree searches, so if you are doing a series of nearest-neighbor
-        queries, it may help to supply the distance to the nearest neighbor
-        of the most recent point.        
-
+    distance_upper_bound : float, optional
+        Distance of x mirror images generation. Must be >= 0
+               
     Returns
     -------
     xs_to_try : np.ndarray
@@ -154,13 +151,6 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
                     xs_to_try.append(mirror_image)
 
     else:
-        lo_x = false
-        hi_x = false
-        lo_y = false
-        hi_y = false
-        lo_z = false
-        hi_z = false
-
         xs_to_try = [real_x]
         coord = np.zeros(3)
         for i in range(m):
