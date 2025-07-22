@@ -112,34 +112,31 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
         Coordinates of the mirror images.
     """
 
-    shiftX = np.zeros(3)
-    shiftY = np.zeros(3)
-    shiftZ = np.zeros(3)
-    end = np.zeros(3)
-
     # Calculate shifts for each axis
-    for i in range(3):
-        shiftX[i] = bounds_matrix[0][i]
-        shiftY[i] = bounds_matrix[1][i]
-        shiftZ[i] = bounds_matrix[2][i]
-        end[i] = bounds_matrix[0][i] + bounds_matrix[1][i] + bounds_matrix[2][i]
+    
+    shiftX = bounds_matrix[0]
+    shiftY = bounds_matrix[1]
+    shiftZ = bounds_matrix[2]
+    end = bounds_matrix[0] + bounds_matrix[1] + bounds_matrix[2]
     # Calculate reciprocal vectors
     reciprocal = np.zeros((3, 3))
-    reciprocal[0][0] = np.cross(bounds_matrix[1][0], bounds_matrix[2][0])
-    reciprocal[1][0] = np.cross(bounds_matrix[2][0], bounds_matrix[0][0])
-    reciprocal[2][0] = np.cross(bounds_matrix[0][0], bounds_matrix[1][0])
+    reciprocal[0] = np.cross(bounds_matrix[1], bounds_matrix[2])
+    reciprocal[1] = np.cross(bounds_matrix[2], bounds_matrix[0])
+    reciprocal[2] = np.cross(bounds_matrix[0], bounds_matrix[1])
 
     # Normalize
     for i in range(3):
-        norm = np.linalg.norm(reciprocal[i][0])
-        for j in range(3):
-            reciprocal[i][j] = reciprocal[i][j]/norm
+        norm = np.linalg.norm(reciprocal[i])
+        if norm > 0:
+            reciprocal[i] = reciprocal[i]/norm
 
 
     # Map x onto the canonical unit cell
     bounds = np.diagonal(bounds_matrix)
     real_x = x - np.where(bounds > 0.0, np.floor(x / bounds) * bounds, 0.0)
     m = len(x)
+
+    xs_to_try = [real_x]
 
     if distance_upper_bound == np.inf:
         for dx in [-1, 0, 1]:
@@ -151,19 +148,18 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
                     xs_to_try.append(mirror_image)
 
     else:
-        xs_to_try = [real_x]
         coord = np.zeros(3)
         for i in range(m):
             coord[i] = real_x[i]
             other = end - coord
 
             # identify the condition 
-            lo_x = np.dot(coord, reciprocal[0][0]) <= distance_upper_bound
-            hi_x = np.dot(other, reciprocal[0][0]) <= distance_upper_bound
-            lo_y = np.dot(coord, reciprocal[1][0]) <= distance_upper_bound
-            hi_y = np.dot(other, reciprocal[1][0]) <= distance_upper_bound
-            lo_z = np.dot(coord, reciprocal[2][0]) <= distance_upper_bound
-            hi_z = np.dot(other, reciprocal[2][0]) <= distance_upper_bound
+            lo_x = np.dot(coord, reciprocal[0]) <= distance_upper_bound
+            hi_x = np.dot(other, reciprocal[0]) <= distance_upper_bound
+            lo_y = np.dot(coord, reciprocal[1]) <= distance_upper_bound
+            hi_y = np.dot(other, reciprocal[1]) <= distance_upper_bound
+            lo_z = np.dot(coord, reciprocal[2]) <= distance_upper_bound
+            hi_z = np.dot(other, reciprocal[2]) <= distance_upper_bound
 
             # Calculate mirror images coordinates depending on proximity to the edge
             if lo_x:
@@ -239,10 +235,10 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
                     xs_to_try.append(coord - shiftY - shiftZ)
 
             if lo_z:
-                xs_to_try.append(coord[j] + shiftZ[j])
+                xs_to_try.append(coord + shiftZ)
 
             elif hi_z:
-                xs_to_try.append(coord[j] - shiftZ[j])
+                xs_to_try.append(coord - shiftZ)
 
     return xs_to_try
 
