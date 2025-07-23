@@ -93,6 +93,28 @@ def build_matrix_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
 
     return bounds_matrix
 
+def map_x_onto_canonical_unit_cell(x, bounds, bounds_matrix):
+    center = np.zeros(3)
+    center[0] = bounds[0]
+    center[1] = bounds[2]
+    center[2] = bounds[4]
+
+    center_x = x - center
+    box_vectors_matrix = bounds_matrix.T
+    box_vectors_matrix_inv = np.linalg.inv(box_vectors_matrix)
+    r = center_x.T
+
+    f = np.dot(box_vectors_matrix_inv, r)
+    g = np.zeros(3)
+    for i in range(3):
+        g[i] = f.T[i] - np.floor(f.T[i])
+
+    x_canonical_center = np.dot(box_vectors_matrix, g.T) 
+    x_canonical = x_canonical_center.T + center
+
+    return x_canonical 
+
+
 
 def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix: np.ndarray, distance_upper_bound: float = np.inf) -> np.ndarray:
     """Produce the mirror images of x coordinates.
@@ -131,12 +153,7 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
             reciprocal[i] = reciprocal[i]/norm
 
 
-    # Map x onto the canonical unit cell
-    bounds = np.diagonal(bounds_matrix)
-    real_x = x - np.where(bounds > 0.0, np.floor(x / bounds) * bounds, 0.0)
-    m = len(x)
-
-    xs_to_try = [real_x]
+    xs_to_try = [x]
 
     if distance_upper_bound == np.inf:
         for dx in [-1, 0, 1]:
@@ -144,101 +161,99 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
                 for dz in [-1, 0, 1]:
                     if dx == 0 and dy == 0 and dz == 0:
                         continue  
-                    mirror_image = real_x + dx*shiftX + dy*shiftY + dz*shiftZ
+                    mirror_image = x + dx*shiftX + dy*shiftY + dz*shiftZ
                     xs_to_try.append(mirror_image)
 
     else:
-        coord = np.zeros(3)
-        for i in range(m):
-            coord[i] = real_x[i]
-            other = end - coord
+        coord = x
+        other = end - coord
 
-            # identify the condition 
-            lo_x = np.dot(coord, reciprocal[0]) <= distance_upper_bound
-            hi_x = np.dot(other, reciprocal[0]) <= distance_upper_bound
-            lo_y = np.dot(coord, reciprocal[1]) <= distance_upper_bound
-            hi_y = np.dot(other, reciprocal[1]) <= distance_upper_bound
-            lo_z = np.dot(coord, reciprocal[2]) <= distance_upper_bound
-            hi_z = np.dot(other, reciprocal[2]) <= distance_upper_bound
+        # identify the condition 
+        lo_x = np.dot(coord, reciprocal[0]) <= distance_upper_bound
+        hi_x = np.dot(other, reciprocal[0]) <= distance_upper_bound
+        lo_y = np.dot(coord, reciprocal[1]) <= distance_upper_bound
+        hi_y = np.dot(other, reciprocal[1]) <= distance_upper_bound
+        lo_z = np.dot(coord, reciprocal[2]) <= distance_upper_bound
+        hi_z = np.dot(other, reciprocal[2]) <= distance_upper_bound
 
-            # Calculate mirror images coordinates depending on proximity to the edge
-            if lo_x:
-                xs_to_try.append(coord + shiftX)
-
-                if lo_y:
-                    xs_to_try.append(coord + shiftX + shiftY)
-                
-                    if lo_z:
-                        xs_to_try.append(coord + shiftX + shiftY +shiftZ)
-
-                    elif hi_z:
-                        xs_to_try.append(coord + shiftX + shiftY - shiftZ)
-
-                elif hi_y:
-                    xs_to_try.append(coord + shiftX - shiftY)
-
-                    if lo_z:
-                        xs_to_try.append(coord + shiftX - shiftY + shiftZ)
-
-                    elif hi_z:
-                        xs_to_try.append(coord + shiftX - shiftY - shiftZ)
-
-                if lo_z:
-                    xs_to_try.append(coord + shiftX + shiftZ)
-
-                elif hi_z:
-                    xs_to_try.append(coord + shiftX - shiftZ)
-
-            elif hi_x:
-                xs_to_try.append(coord - shiftX)
-
-                if lo_y:
-                    xs_to_try.append(coord - shiftX + shiftY)
-                
-                    if lo_z:
-                        xs_to_try.append(coord - shiftX + shiftY +shiftZ)
-
-                    elif hi_z:
-                        xs_to_try.append(coord - shiftX + shiftY - shiftZ)
-
-                elif hi_y:
-                    xs_to_try.append(coord - shiftX - shiftY)
-
-                    if lo_z:
-                        xs_to_try.append(coord - shiftX - shiftY + shiftZ)
-
-                    elif hi_z:
-                        xs_to_try.append(coord - shiftX - shiftY - shiftZ)
-
-                if lo_z:
-                    xs_to_try.append(coord - shiftX + shiftZ)
-
-                elif hi_z:
-                    xs_to_try.append(coord - shiftX - shiftZ)
+        # Calculate mirror images coordinates depending on proximity to the edge
+        if lo_x:
+            xs_to_try.append(coord + shiftX)
 
             if lo_y:
-                xs_to_try.append(coord + shiftY)
+                xs_to_try.append(coord + shiftX + shiftY)
                 
                 if lo_z:
-                    xs_to_try.append(coord + shiftY + shiftZ)
+                    xs_to_try.append(coord + shiftX + shiftY +shiftZ)
 
                 elif hi_z:
-                    xs_to_try(coord + shiftY - shiftZ)
+                    xs_to_try.append(coord + shiftX + shiftY - shiftZ)
 
             elif hi_y:
-                xs_to_try.append(coord - shiftY)
+                xs_to_try.append(coord + shiftX - shiftY)
 
                 if lo_z:
-                    xs_to_try.append(coord - shiftY + shiftZ)
+                    xs_to_try.append(coord + shiftX - shiftY + shiftZ)
 
                 elif hi_z:
-                    xs_to_try.append(coord - shiftY - shiftZ)
+                    xs_to_try.append(coord + shiftX - shiftY - shiftZ)
 
             if lo_z:
-                xs_to_try.append(coord + shiftZ)
+                xs_to_try.append(coord + shiftX + shiftZ)
 
             elif hi_z:
-                xs_to_try.append(coord - shiftZ)
+                xs_to_try.append(coord + shiftX - shiftZ)
+
+        elif hi_x:
+            xs_to_try.append(coord - shiftX)
+
+            if lo_y:
+                xs_to_try.append(coord - shiftX + shiftY)
+                
+                if lo_z:
+                    xs_to_try.append(coord - shiftX + shiftY +shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord - shiftX + shiftY - shiftZ)
+
+            elif hi_y:
+                xs_to_try.append(coord - shiftX - shiftY)
+
+                if lo_z:
+                    xs_to_try.append(coord - shiftX - shiftY + shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord - shiftX - shiftY - shiftZ)
+
+            if lo_z:
+                xs_to_try.append(coord - shiftX + shiftZ)
+
+            elif hi_z:
+                xs_to_try.append(coord - shiftX - shiftZ)
+
+        if lo_y:
+            xs_to_try.append(coord + shiftY)
+                
+            if lo_z:
+                xs_to_try.append(coord + shiftY + shiftZ)
+
+            elif hi_z:
+                xs_to_try(coord + shiftY - shiftZ)
+
+        elif hi_y:
+            xs_to_try.append(coord - shiftY)
+
+            if lo_z:
+                xs_to_try.append(coord - shiftY + shiftZ)
+
+            elif hi_z:
+                xs_to_try.append(coord - shiftY - shiftZ)
+
+        if lo_z:
+            xs_to_try.append(coord + shiftZ)
+
+        elif hi_z:
+            xs_to_try.append(coord - shiftZ)
 
     return xs_to_try
 
