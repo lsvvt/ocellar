@@ -45,29 +45,39 @@ def _gen_relevant_images(x, bounds, distance_upper_bound):
 
     return xs_to_try
 
+
 def build_matrix_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
     """Build a matrix representation of the cell bounds.
 
-        Parameters
-        ----------
+    Parameters
+    ----------
         bounds : np.typing.ArrayLike
             6 values of the cell boundary coordinates and 3 angles between the edges
 
-        Returns
-        -------
-        bounds_matrix : np.ndarray
+    Returns
+    -------
+        cell_matrix : np.ndarray
             A matrix representation of the cell bounds.
-        """
-    
+
+    """
     lx = bounds[1] - bounds[0]
     ly = bounds[3] - bounds[2]
     lz = bounds[5] - bounds[4]
+    if lx <= 0:
+        raise ValueError("Lenght along X axis must be > 0")
+    if ly <= 0:
+        raise ValueError("Lenght along Y axis must be > 0")
+    if lz <= 0:
+        raise ValueError("Lenght along Z axis must be > 0")
     alpha = bounds[6]
     beta = bounds[7]
     gamma = bounds[8]
 
-    bounds_matrix = np.zeros((3, 3))
-    bounds_matrix[0, 0] = lx
+    if not (0 <= alpha <= 180) or not (0 <= beta <= 180) or not (0 <= gamma <= 180):
+        raise ValueError("Angles between the edges must be in the range from 0 to 180")
+
+    cell_matrix = np.zeros((3, 3))
+    cell_matrix[0, 0] = lx
     if alpha == 90.0:
         cos_alpha = 0.0
     else:
@@ -83,24 +93,37 @@ def build_matrix_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
         gamma = np.radians(gamma)
         cos_gamma = np.cos(gamma)
         sin_gamma = np.sin(gamma)
-    bounds_matrix[1, 0] = ly * cos_gamma
-    bounds_matrix[1, 1] = ly * sin_gamma
-    bounds_matrix[2, 0] = lz * cos_beta
-    bounds_matrix[2, 1] = lz * (cos_alpha - cos_beta * cos_gamma) / sin_gamma
-    bounds_matrix[2, 2] = np.sqrt(
-        lz * lz - bounds_matrix[2, 0] ** 2 - bounds_matrix[2, 1] ** 2
+    cell_matrix[1, 0] = ly * cos_gamma
+    cell_matrix[1, 1] = ly * sin_gamma
+    cell_matrix[2, 0] = lz * cos_beta
+    cell_matrix[2, 1] = lz * (cos_alpha - cos_beta * cos_gamma) / sin_gamma
+    cell_matrix[2, 2] = np.sqrt(
+        lz * lz - cell_matrix[2, 0] ** 2 - cell_matrix[2, 1] ** 2
     )
 
-    return bounds_matrix
+    return cell_matrix
 
-def map_x_onto_canonical_unit_cell(x, bounds, bounds_matrix):
-    center = np.zeros(3)
-    center[0] = bounds[0]
-    center[1] = bounds[2]
-    center[2] = bounds[4]
 
+def wrap_into_triclinic(x, center, cell_matrix) -> np.ndarray:
+    """Wrap x into the canonical unit triclinic cell.
+
+    Parameters
+    ----------
+    x : np.typing.ArrayLike
+        An array of points.
+    center : np.typing.ArrayLike
+        A cell cetner coordinates.
+    cell_matrix : np.ndarray
+        A matrix representation of the cell bounds.
+
+    Returns
+    -------
+    x_canonical : np.ndarray
+        Coordinates of the x point into the triclinic cell
+
+    """
     center_x = x - center
-    box_vectors_matrix = bounds_matrix.T
+    box_vectors_matrix = cell_matrix.T
     box_vectors_matrix_inv = np.linalg.inv(box_vectors_matrix)
     r = center_x.T
 
@@ -109,66 +132,76 @@ def map_x_onto_canonical_unit_cell(x, bounds, bounds_matrix):
     for i in range(3):
         g[i] = f.T[i] - np.floor(f.T[i])
 
-    x_canonical_center = np.dot(box_vectors_matrix, g.T) 
+    x_canonical_center = np.dot(box_vectors_matrix, g.T)
     x_canonical = x_canonical_center.T + center
 
-    return x_canonical 
+    return x_canonical
 
 
-
-def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix: np.ndarray, distance_upper_bound: float = np.inf) -> np.ndarray:
+def gen_relevant_images_for_triclinic_cell(
+    x: np.typing.ArrayLike,
+    center: np.typing.ArrayLike,
+    cell_matrix: np.ndarray,
+    distance_upper_bound: float = np.inf,
+) -> np.ndarray:
     """Produce the mirror images of x coordinates.
 
     Parameters
     ----------
     x : np.typing.ArrayLike
         An array of points.
-    bounds_matrix : np.ndarray
+    center : np.typing.ArrayLike
+        A cell cetner coordinates.
+    cell_matrix : np.ndarray
         A matrix representation of the cell bounds.
     distance_upper_bound : float, optional
         Distance of x mirror images generation. Must be >= 0
-               
+
     Returns
     -------
     xs_to_try : np.ndarray
         Coordinates of the mirror images.
-    """
 
+    """
     # Calculate shifts for each axis
-    
-    shiftX = bounds_matrix[0]
-    shiftY = bounds_matrix[1]
-    shiftZ = bounds_matrix[2]
-    end = bounds_matrix[0] + bounds_matrix[1] + bounds_matrix[2]
+
+    shiftX = cell_matrix[0]
+    shiftY = cell_matrix[1]
+    shiftZ = cell_matrix[2]
+    end = cell_matrix[0] + cell_matrix[1] + cell_matrix[2]
     # Calculate reciprocal vectors
     reciprocal = np.zeros((3, 3))
-    reciprocal[0] = np.cross(bounds_matrix[1], bounds_matrix[2])
-    reciprocal[1] = np.cross(bounds_matrix[2], bounds_matrix[0])
-    reciprocal[2] = np.cross(bounds_matrix[0], bounds_matrix[1])
+    reciprocal[0] = np.cross(cell_matrix[1], cell_matrix[2])
+    reciprocal[1] = np.cross(cell_matrix[2], cell_matrix[0])
+    reciprocal[2] = np.cross(cell_matrix[0], cell_matrix[1])
 
     # Normalize
     for i in range(3):
         norm = np.linalg.norm(reciprocal[i])
         if norm > 0:
-            reciprocal[i] = reciprocal[i]/norm
+            reciprocal[i] = reciprocal[i] / norm
 
+    # Map x onto the canonical unit cell
+    real_x = wrap_into_triclinic(x, center, cell_matrix)
+    xs_to_try = [real_x]
 
-    xs_to_try = [x]
+    if distance_upper_bound <= 0:
+        raise ValueError("Distance upper bound must be > 0")
 
     if distance_upper_bound == np.inf:
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
                 for dz in [-1, 0, 1]:
                     if dx == 0 and dy == 0 and dz == 0:
-                        continue  
-                    mirror_image = x + dx*shiftX + dy*shiftY + dz*shiftZ
+                        continue
+                    mirror_image = real_x + dx * shiftX + dy * shiftY + dz * shiftZ
                     xs_to_try.append(mirror_image)
 
     else:
-        coord = x
+        coord = real_x
         other = end - coord
 
-        # identify the condition 
+        # identify the condition
         lo_x = np.dot(coord, reciprocal[0]) <= distance_upper_bound
         hi_x = np.dot(other, reciprocal[0]) <= distance_upper_bound
         lo_y = np.dot(coord, reciprocal[1]) <= distance_upper_bound
@@ -182,9 +215,9 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
 
             if lo_y:
                 xs_to_try.append(coord + shiftX + shiftY)
-                
+
                 if lo_z:
-                    xs_to_try.append(coord + shiftX + shiftY +shiftZ)
+                    xs_to_try.append(coord + shiftX + shiftY + shiftZ)
 
                 elif hi_z:
                     xs_to_try.append(coord + shiftX + shiftY - shiftZ)
@@ -209,9 +242,9 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
 
             if lo_y:
                 xs_to_try.append(coord - shiftX + shiftY)
-                
+
                 if lo_z:
-                    xs_to_try.append(coord - shiftX + shiftY +shiftZ)
+                    xs_to_try.append(coord - shiftX + shiftY + shiftZ)
 
                 elif hi_z:
                     xs_to_try.append(coord - shiftX + shiftY - shiftZ)
@@ -233,12 +266,12 @@ def gen_relevant_images_for_triclinic_cell(x: np.typing.ArrayLike, bounds_matrix
 
         if lo_y:
             xs_to_try.append(coord + shiftY)
-                
+
             if lo_z:
                 xs_to_try.append(coord + shiftY + shiftZ)
 
             elif hi_z:
-                xs_to_try(coord + shiftY - shiftZ)
+                xs_to_try.append(coord + shiftY - shiftZ)
 
         elif hi_y:
             xs_to_try.append(coord - shiftY)
