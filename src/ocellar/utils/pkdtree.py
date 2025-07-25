@@ -104,7 +104,9 @@ def build_matrix_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
     return cell_matrix
 
 
-def wrap_into_triclinic(x, center, cell_matrix) -> np.ndarray:
+def wrap_into_triclinic(
+    x: np.typing.ArrayLike, center: np.typing.ArrayLike, cell_matrix: np.ndarray
+) -> np.ndarray:
     """Wrap x into the canonical unit triclinic cell.
 
     Parameters
@@ -322,7 +324,11 @@ class PeriodicKDTree(KDTree):
     """
 
     def __init__(
-        self, bounds: np.typing.ArrayLike, data: np.typing.ArrayLike, leafsize: int = 10
+        self,
+        bounds: np.typing.ArrayLike,
+        center: np.typing.ArrayLike,
+        data: np.typing.ArrayLike,
+        leafsize: int = 10,
     ) -> None:
         """Initialize PeriodicKDTree.
 
@@ -341,10 +347,9 @@ class PeriodicKDTree(KDTree):
         """
         # Map all points to canonical periodic image
         self.bounds = np.array(bounds)
+        self.center = np.array(center)
         self.real_data = np.asarray(data)
-        wrapped_data = self.real_data - np.where(
-            bounds > 0.0, (np.floor(self.real_data / bounds) * bounds), 0.0
-        )
+        wrapped_data = wrap_into_triclinic(self.real_data, self.center, self.bounds)
 
         # Calculate maximum distance_upper_bound
         self.max_distance_upper_bound = np.min(
@@ -513,7 +518,9 @@ class PeriodicKDTree(KDTree):
 
         # Run queries over all relevant images of x
         results = []
-        for real_x in _gen_relevant_images(x, self.bounds, r):
+        for real_x in gen_relevant_images_for_triclinic_cell(
+            x, self.center, self.bounds, r
+        ):
             results.extend(super().query_ball_point(real_x, r, p, eps, workers=-1))
         return results
 
