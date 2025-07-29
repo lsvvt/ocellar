@@ -71,23 +71,25 @@ class Dinternal(Driver):
 
         """
         s_idxs = list(map(lambda x: str(x + 1), idxs))
+        out_lines = []
+        read_atoms = False
 
         with open(input_geometry) as f:
             lines = f.readlines()
-            lines = lines[: lines.index("END_CFG\n")]
-            out_lines = [
-                line
-                for line in lines
-                if not (
-                    len(line.split()) > 7
-                    and line.split()[0] not in s_idxs
-                    and line.split()[1].isdigit()
-                )
-            ]
-            out_lines[2] = str(len(idxs)) + "\n"
-            with open(file_name, "w") as f_out:
-                f_out.writelines(out_lines)
-                f_out.write("END_CFG\n")
+            num_atoms = int(lines[2])
+            for i, line in enumerate(lines):
+                if "ITEM: ATOMS" in line:
+                    read_atoms = True
+                if read_atoms:
+                    start_idx = i
+                    break
+            for i in range(start_idx, start_idx + num_atoms):
+                if lines[i].split()[0] in s_idxs:
+                    out_lines.append(lines[i])
+            out_lines.extend(lines[(start_idx + num_atoms) :])
+            out_lines[2] = str(len(idxs)) + "\n"  # change number of atoms in .cfg file
+        with open(file_name, "w") as f_out:
+            f_out.writelines(out_lines)
 
     @classmethod
     def _save_dump(cls, file_name: str, input_geometry: str, idxs: list[int]) -> None:
@@ -108,19 +110,20 @@ class Dinternal(Driver):
 
         """
         s_idxs = list(map(lambda x: str(x + 1), idxs))
+        out_lines = []
+        read_atoms = False
 
         with open(input_geometry) as f:
-            out_lines = [
-                line
-                for line in f
-                if not (
-                    len(line.split()) > 5
-                    and line.split()[0] not in s_idxs
-                    and line.split()[2].replace(".", "", 1).isdigit()
-                )
-            ]
+            for line in f:
+                if read_atoms:
+                    if line.split()[0] in s_idxs:
+                        out_lines.append(line)
+                else:
+                    out_lines.append(line)
+                if "ITEM: ATOMS" in line:
+                    read_atoms = True
             out_lines[out_lines.index("ITEM: NUMBER OF ATOMS\n") + 1] = (
                 str(len(idxs)) + "\n"
             )
-            with open(file_name, "w") as f_out:
-                f_out.writelines(out_lines)
+        with open(file_name, "w") as f_out:
+            f_out.writelines(out_lines)

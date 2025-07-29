@@ -1,8 +1,14 @@
+"""Main ocellar package module, containing Molecule class."""
+
+import warnings
+from pathlib import Path
+
 import networkx
 import numpy as np
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 
 from ocellar import io
+from ocellar.utils.pkdtree import PeriodicKDTree
 
 
 class Molecule:
@@ -24,23 +30,41 @@ class Molecule:
         Element symbols corresponding to atom types in certain file formats
         (CFG, LAMMPS dump). Required when atoms are specified by numeric
         type identifiers rather than element symbols.
+    bounds : list[float] or None
+        List of unit cell dimensions in format `[L_x, L_y, L_z]`.
+    unwrapped: bool
+        True if Molecule was unwrapped by :py:meth:`Molecule.unwrap` method
 
     """
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(
+        self,
+        input_geometry: str | Path | None = None,
+        element_types: np.typing.ArrayLike | None = None,
+        bounds: np.typing.ArrayLike | None = None,
+    ) -> None:
         """Initialize the Molecule object.
 
         Parameters
         ----------
-        **kwargs
-            Arbitrary keyword arguments to set as attributes.
+        input_geometry : str or Path or None
+            Path to the input geometry file.
+        element_types : np.typing.ArrayLike or None
+            Element symbols corresponding to atom types in certain file formats
+            (CFG, LAMMPS dump). Required when atoms are specified by numeric
+            type identifiers rather than element symbols.
+        bounds : np.typing.ArrayLike or None
+            List of unit cell dimensions in format `[L_x, L_y, L_z]`.
 
         """
-        self.input_geometry = None
+        self.input_geometry = input_geometry
+        self.element_types = element_types
+        if bounds is not None:
+            self.bounds = np.array(bounds)
         self.geometry = None
-        self.element_types = None
-        for key, val in kwargs.items():
-            setattr(self, key, val)
+        self.graph = None
+        self.subgraphs = None
+        self.unwrapped = None
 
     def build_geometry(self, backend: str = "cclib") -> None:
         """Build molecular geometry from input file.
@@ -60,8 +84,10 @@ class Molecule:
         Raises
         ------
         ValueError
-            If input_geometry is not defined or if element_types is required
-            but not provided for the selected backend.
+            If `input_geometry` is not defined or
+            if `element_types` is required but not provided
+            for the selected backend
+            or if `bounds` is required but not provided.
 
         """
         if self.input_geometry is None:
@@ -73,7 +99,11 @@ class Molecule:
         else:
             if self.element_types is None:
                 raise ValueError("element_types is not defined")
-
+            if self.bounds is None:
+                warnings.warn(
+                    "Cell bounds are not defined, extracting will be non-periodic",
+                    stacklevel=2,
+                )
             self.geometry = driver._build_geometry(
                 self.input_geometry, self.element_types
             )
@@ -91,7 +121,7 @@ class Molecule:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
 
         driver = io.Driver(backend)
-        self.graph = driver._build_bonds(self.geometry)
+        self.graph = driver._build_bonds(self)
 
     def save_xyz(self, file_name: str, backend: str = "cclib") -> None:
         """Save the molecule geometry in XYZ format.
@@ -216,9 +246,12 @@ class Molecule:
         """
         if self.geometry is None:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
-
-        tree = cKDTree(self.geometry[1])
-        idx = tree.query_ball_point(center, r)
+        center = np.array(center)
+        if self.bounds is None:
+            tree = KDTree(data=self.geometry[1])
+        else:
+            tree = PeriodicKDTree(bounds=self.bounds, data=self.geometry[1])
+        idx = tree.query_ball_point(center, r, workers=-1)
         return idx
 
     def select(self, selected_atoms: list[int]) -> "Molecule":
@@ -231,12 +264,28 @@ class Molecule:
 
         Returns
         -------
-        Molecule
-            A new Molecule object containing the selected atoms.
+        tuple: [Molecule, list[int]]
+            A tuple containing:
+            - Molecule: A new Molecule object containing the selected atoms
+            and necessary hydrogens.
+            - list[int]: An array of selected atoms index.
+
         """
 
-        def norm(xyz) -> np.ndarray:
-            """Normalize a vector."""
+        def norm(xyz: np.typing.ArrayLike) -> np.ndarray:
+            """Normalize a vector.
+
+            Parameters
+            ----------
+            xyz : np.typing.ArrayLike
+                Vector coordinates
+
+            Returns
+            -------
+            np.ndarray
+                Normalized coordinates of given vector
+
+            """
             return np.array(xyz) / np.linalg.norm(xyz)
 
         if self.geometry is None or self.graph is None or self.subgraphs is None:
@@ -256,7 +305,7 @@ class Molecule:
                     )
                     new_hydrogens.append(hydrogen_position)
 
-        new_molecule = Molecule()
+        new_molecule = Molecule(bounds=self.bounds)
         selected_atoms.sort()
 
         new_molecule.geometry = (
@@ -270,7 +319,7 @@ class Molecule:
                 np.append(new_molecule.geometry[1], np.array(new_hydrogens), axis=0),
             )
 
-        return new_molecule
+        return new_molecule, selected_atoms
     
     def expand_selection(self, idxs: list[int]) -> list[int]:
         """Select a subset of molecules and electronegative atoms/functional froups near it.
@@ -311,3 +360,42 @@ class Molecule:
                                 selected_atoms.append(next_neighbor)    
 
         return selected_atoms 
+
+    def unwrap(self, ref_atom: list[float]) -> None:
+        """Unwrap Molecule atomic coordinates relative to a reference atom.
+
+        PBC in all axis and axis-aligned
+        orthorhombic cell centred at (0, 0, 0) are assumed.
+
+        Parameters
+        ----------
+        ref_atom : list of float
+            Reference atom coordinates [x_ref, y_ref, z_ref].
+
+        Returns
+        -------
+        None
+            Unwraps coordinates in the same order as in `self.geometry` **inplace**.
+
+        """
+        coords_arr = np.asarray(self.geometry[1], dtype=float)
+        cell_lengths = np.asarray(self.bounds, dtype=float)
+        ref_arr = np.asarray(ref_atom, dtype=float)
+
+        if coords_arr.ndim != 2 or coords_arr.shape[1] != 3:
+            raise ValueError("`self.geometry[1]` must be an (N, 3) array-like object.")
+        if cell_lengths.shape != (3,):
+            raise ValueError("`self.bounds` must be a 3-element sequence [Lx, Ly, Lz].")
+        if np.any(cell_lengths <= 0):
+            raise ValueError("All cell lengths must be positive.")
+        if ref_arr.shape != (3,):
+            raise ValueError(
+                "`ref_atom` must contain three floats (x_ref, y_ref, z_ref)."
+            )
+
+        delta = coords_arr - ref_arr  # displacement to reference
+        shift = np.round(delta / cell_lengths)  # nearest integer vector
+        unwrapped = coords_arr - shift * cell_lengths  # move by −n·L
+
+        self.geometry = (self.geometry[0], unwrapped)
+        self.unwrapped = True
