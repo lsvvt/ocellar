@@ -256,13 +256,13 @@ class Molecule:
         idx = tree.query_ball_point(center, r, workers=-1)
         return idx
 
-    def select(self, idxs: list[int]) -> tuple["Molecule", list[int]]:
+    def select(self, selected_atoms: list[int]) -> "Molecule":
         """Select a subset of the molecule based on atom indices.
 
         Parameters
         ----------
         idxs : list[int]
-            list of atom indices to select.
+            list of selected atom indices.
 
         Returns
         -------
@@ -296,12 +296,6 @@ class Molecule:
                 "Call build_geometry(), build_graph(), and build_structure() first."
             )
 
-        # Include complete molecular fragments containing selected atoms
-        selected_atoms = []
-        for subgraph in self.subgraphs:
-            if any(idx in idxs for idx in subgraph):
-                selected_atoms.extend(list(subgraph))
-
         new_hydrogens = []
         for atom in selected_atoms:
             for neighbor in self.graph.neighbors(atom):
@@ -328,6 +322,46 @@ class Molecule:
             )
 
         return new_molecule, selected_atoms
+    
+    def expand_selection(self, idxs: list[int]) -> list[int]:
+        """Select a subset of molecules and electronegative atoms/functional froups near it.
+
+        Parameters
+        ----------
+        idxs : list[int]
+            list of atom indices to select.
+
+        Returns
+        -------
+        list[int]
+            Indices of selected atoms. 
+        """
+        if self.geometry is None or self.graph is None or self.subgraphs is None:
+            raise ValueError(
+                "Molecule structure is not fully built."
+                "Call build_geometry(), build_graph(), and build_structure() first."
+            )
+
+        # Include complete molecular fragments containing selected atoms
+        selected_atoms = []
+        for subgraph in self.subgraphs:
+            if any(idx in idxs for idx in subgraph):
+                selected_atoms.extend(list(subgraph))
+
+        electronegative_atoms = {"O", "S", "N", "P"}
+        functional_group_atoms = {'F', "O", "Br", "Cl", "I"}        
+
+        for atom in selected_atoms:
+            for neighbor in self.graph.neighbors(atom):
+                if self.geometry[0][neighbor] in electronegative_atoms and neighbor not in selected_atoms:
+                    selected_atoms.append(neighbor)
+                if self.geometry[0][neighbor] in {"C", "N"}:
+                    if any(self.geometry[0][c_n_neighbor] in functional_group_atoms for c_n_neighbor in self.graph.neighbors(neighbor)):
+                        for next_neighbor in self.graph.neighbors(neighbor):
+                            if next_neighbor not in selected_atoms:
+                                selected_atoms.append(next_neighbor)    
+
+        return selected_atoms 
 
     def unwrap(self, ref_atom: list[float]) -> None:
         """Unwrap Molecule atomic coordinates relative to a reference atom.
