@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import networkx
 import numpy
 import periodictable
-from openbabel import openbabel, pybel  # type: ignore
+from openbabel import openbabel, pybel
 
 from ocellar.io.driver import Driver
 
@@ -69,16 +69,16 @@ class DOpenbabel(Driver):
         """
         obmol = openbabel.OBMol()
 
-        if mol.bounds is not None:
+        if mol.cell_bounds is not None:
             obmol.SetPeriodicMol()
             obcell = openbabel.OBUnitCell()
             obcell.SetData(
-                float(mol.bounds[0]),
-                float(mol.bounds[1]),
-                float(mol.bounds[2]),
-                90,
-                90,
-                90,
+                mol.cell_bounds[0],
+                mol.cell_bounds[1],
+                mol.cell_bounds[2],
+                mol.cell_bounds[3],
+                mol.cell_bounds[4],
+                mol.cell_bounds[5],
             )
             obmol.CloneData(obcell)
 

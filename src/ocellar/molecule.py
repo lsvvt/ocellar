@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial import KDTree
 
 from ocellar import io
-from ocellar.utils.pkdtree import PeriodicKDTree
+from ocellar.utils.pkdtree import PeriodicKDTree, cell_matrix_from_bounds
 
 
 class Molecule:
@@ -18,6 +18,14 @@ class Molecule:
     ----------
     input_geometry : str or None
         Path to the input geometry file.
+    element_types : list[str] or None
+        Element symbols corresponding to atom types in certain file formats
+        (CFG, LAMMPS dump). Required when atoms are specified by numeric
+        type identifiers rather than element symbols.
+    cell_center : np.typing.ArrayLike or None
+        List of cell center coordinates in format `[x_0, y_0, z_0]`.
+    cell_bounds : np.typing.ArrayLike or None
+        List of cell parameters in format `[L_x, L_y, L_z, alpha, beta, gamma]`.
     geometry : tuple[list, np.ndarray] or None
         A tuple containing:
         - list: A list of element symbols.
@@ -26,12 +34,6 @@ class Molecule:
         Graph representation of the molecular structure.
     subgraphs : list or None
         list of connected components in the molecular graph.
-    element_types : list[str] or None
-        Element symbols corresponding to atom types in certain file formats
-        (CFG, LAMMPS dump). Required when atoms are specified by numeric
-        type identifiers rather than element symbols.
-    bounds : list[float] or None
-        List of unit cell dimensions in format `[L_x, L_y, L_z]`.
     unwrapped: bool
         True if Molecule was unwrapped by :py:meth:`Molecule.unwrap` method
 
@@ -41,7 +43,8 @@ class Molecule:
         self,
         input_geometry: str | Path | None = None,
         element_types: np.typing.ArrayLike | None = None,
-        bounds: np.typing.ArrayLike | None = None,
+        cell_center: np.typing.ArrayLike | None = None,
+        cell_bounds: np.typing.ArrayLike | None = None,
     ) -> None:
         """Initialize the Molecule object.
 
@@ -53,16 +56,16 @@ class Molecule:
             Element symbols corresponding to atom types in certain file formats
             (CFG, LAMMPS dump). Required when atoms are specified by numeric
             type identifiers rather than element symbols.
-        bounds : np.typing.ArrayLike or None
-            List of unit cell dimensions in format `[L_x, L_y, L_z]`.
+        cell_center : np.typing.ArrayLike or None
+            List of cell center coordinates in format `[x_0, y_0, z_0]`.
+        cell_bounds : np.typing.ArrayLike or None
+            List of cell parameters in format `[L_x, L_y, L_z, alpha, beta, gamma]`.
 
         """
         self.input_geometry = input_geometry
         self.element_types = element_types
-        if bounds is not None:
-            self.bounds = np.array(bounds)
-        else:
-            self.bounds = None
+        self.cell_bounds = np.array(cell_bounds) if cell_bounds is not None else None
+        self.cell_center = np.array(cell_center) if cell_center is not None else None
         self.geometry = None
         self.graph = None
         self.subgraphs = None
@@ -88,8 +91,7 @@ class Molecule:
         ValueError
             If `input_geometry` is not defined or
             if `element_types` is required but not provided
-            for the selected backend
-            or if `bounds` is required but not provided.
+            for the selected backend or if `bounds` is required but not provided.
 
         """
         if self.input_geometry is None:
@@ -101,7 +103,7 @@ class Molecule:
         else:
             if self.element_types is None:
                 raise ValueError("element_types is not defined")
-            if self.bounds is None:
+            if self.cell_bounds is None:
                 warnings.warn(
                     "Cell bounds are not defined, extracting will be non-periodic",
                     stacklevel=2,
@@ -242,26 +244,32 @@ class Molecule:
 
         Returns
         -------
-        list[int]
-            Indices of atoms within the specified radius.
+        idx : list[int]
+            Indices of atoms within the specified radius,
+            with respect to PBC if cell_bounds is defined.
 
         """
         if self.geometry is None:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
         center = np.array(center)
-        if self.bounds is None:
+        if self.cell_bounds is None:
             tree = KDTree(data=self.geometry[1])
+            idx = tree.query_ball_point(center, r, workers=-1)
         else:
-            tree = PeriodicKDTree(cell_bounds=self.bounds, data=self.geometry[1])
-        idx = tree.query_ball_point(center, r, workers=-1)
+            tree = PeriodicKDTree(
+                cell_bounds=self.cell_bounds,
+                cell_center=self.cell_center,
+                data=self.geometry[1],
+            )
+            idx = tree.query_ball_point(center, r, workers=-1)
         return idx
 
-    def select(self, selected_atoms: list[int]) -> "Molecule":
+    def select(self, selected_atoms: list[int]) -> tuple["Molecule", list[int]]:
         """Select a subset of the molecule based on atom indices.
 
         Parameters
         ----------
-        idxs : list[int]
+        selected_atoms : list[int]
             list of selected atom indices.
 
         Returns
@@ -307,7 +315,7 @@ class Molecule:
                     )
                     new_hydrogens.append(hydrogen_position)
 
-        new_molecule = Molecule(bounds=self.bounds)
+        new_molecule = Molecule(cell_bounds=self.cell_bounds)
         selected_atoms.sort()
 
         new_molecule.geometry = (
@@ -324,17 +332,18 @@ class Molecule:
         return new_molecule, selected_atoms
 
     def expand_selection(self, idxs: list[int]) -> list[int]:
-        """Select a subset of molecules and electronegative atoms/functional froups near it.
+        """Select electronegative atoms/functional group near the edge of selection.
 
         Parameters
         ----------
         idxs : list[int]
-            list of atom indices to select.
+            List of atom indices of initial selection by radius.
 
         Returns
         -------
         list[int]
             Indices of selected atoms.
+
         """
         if self.geometry is None or self.graph is None or self.subgraphs is None:
             raise ValueError(
@@ -349,7 +358,7 @@ class Molecule:
                 selected_atoms.extend(list(subgraph))
 
         electronegative_atoms = {"O", "S", "N", "P"}
-        functional_group_atoms = {"F", "O", "Br", "Cl", "I"}
+        functional_group_atoms = {"O", "N", "F", "Cl", "Br", "I"}
 
         for atom in selected_atoms:
             for neighbor in self.graph.neighbors(atom):
@@ -372,12 +381,11 @@ class Molecule:
     def unwrap(self, ref_atom: list[float]) -> None:
         """Unwrap Molecule atomic coordinates relative to a reference atom.
 
-        PBC in all axis and axis-aligned
-        orthorhombic cell centred at (0, 0, 0) are assumed.
+        PBC in all axis are assumed.
 
         Parameters
         ----------
-        ref_atom : list of float
+        ref_atom : list[float]
             Reference atom coordinates [x_ref, y_ref, z_ref].
 
         Returns
@@ -386,24 +394,14 @@ class Molecule:
             Unwraps coordinates in the same order as in `self.geometry` **inplace**.
 
         """
-        coords_arr = np.asarray(self.geometry[1], dtype=float)
-        cell_lengths = np.asarray(self.bounds, dtype=float)
         ref_arr = np.asarray(ref_atom, dtype=float)
+        coords_arr = np.asarray(self.geometry[1], dtype=float)
+        cell_col = np.asarray(cell_matrix_from_bounds(self.cell_bounds)).T
+        cell_inv = np.linalg.inv(cell_col)
 
-        if coords_arr.ndim != 2 or coords_arr.shape[1] != 3:
-            raise ValueError("`self.geometry[1]` must be an (N, 3) array-like object.")
-        if cell_lengths.shape != (3,):
-            raise ValueError("`self.bounds` must be a 3-element sequence [Lx, Ly, Lz].")
-        if np.any(cell_lengths <= 0):
-            raise ValueError("All cell lengths must be positive.")
-        if ref_arr.shape != (3,):
-            raise ValueError(
-                "`ref_atom` must contain three floats (x_ref, y_ref, z_ref)."
-            )
+        delta_frac = (coords_arr - ref_arr) @ cell_inv  # fractional separation
+        shift = np.round(delta_frac)  # nearest lattice vector (-1, 0, 1)
+        coords_unwrapped = coords_arr - shift @ cell_col
 
-        delta = coords_arr - ref_arr  # displacement to reference
-        shift = np.round(delta / cell_lengths)  # nearest integer vector
-        unwrapped = coords_arr - shift * cell_lengths  # move by −n·L
-
-        self.geometry = (self.geometry[0], unwrapped)
+        self.geometry = (self.geometry[0], coords_unwrapped)
         self.unwrapped = True
