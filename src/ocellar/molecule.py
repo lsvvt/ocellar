@@ -252,7 +252,7 @@ class Molecule:
         if self.bounds is None:
             tree = KDTree(data=self.geometry[1])
         else:
-            tree = PeriodicKDTree(bounds=self.bounds, data=self.geometry[1])
+            tree = PeriodicKDTree(cell_bounds=self.bounds, data=self.geometry[1])
         idx = tree.query_ball_point(center, r, workers=-1)
         return idx
 
@@ -322,7 +322,7 @@ class Molecule:
             )
 
         return new_molecule, selected_atoms
-    
+
     def expand_selection(self, idxs: list[int]) -> list[int]:
         """Select a subset of molecules and electronegative atoms/functional froups near it.
 
@@ -334,7 +334,7 @@ class Molecule:
         Returns
         -------
         list[int]
-            Indices of selected atoms. 
+            Indices of selected atoms.
         """
         if self.geometry is None or self.graph is None or self.subgraphs is None:
             raise ValueError(
@@ -349,19 +349,25 @@ class Molecule:
                 selected_atoms.extend(list(subgraph))
 
         electronegative_atoms = {"O", "S", "N", "P"}
-        functional_group_atoms = {'F', "O", "Br", "Cl", "I"}        
+        functional_group_atoms = {"F", "O", "Br", "Cl", "I"}
 
         for atom in selected_atoms:
             for neighbor in self.graph.neighbors(atom):
-                if self.geometry[0][neighbor] in electronegative_atoms and neighbor not in selected_atoms:
+                if (
+                    self.geometry[0][neighbor] in electronegative_atoms
+                    and neighbor not in selected_atoms
+                ):
                     selected_atoms.append(neighbor)
                 if self.geometry[0][neighbor] in {"C", "N"}:
-                    if any(self.geometry[0][c_n_neighbor] in functional_group_atoms for c_n_neighbor in self.graph.neighbors(neighbor)):
+                    if any(
+                        self.geometry[0][c_n_neighbor] in functional_group_atoms
+                        for c_n_neighbor in self.graph.neighbors(neighbor)
+                    ):
                         for next_neighbor in self.graph.neighbors(neighbor):
                             if next_neighbor not in selected_atoms:
-                                selected_atoms.append(next_neighbor)    
+                                selected_atoms.append(next_neighbor)
 
-        return selected_atoms 
+        return selected_atoms
 
     def unwrap(self, ref_atom: list[float]) -> None:
         """Unwrap Molecule atomic coordinates relative to a reference atom.

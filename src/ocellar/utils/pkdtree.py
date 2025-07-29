@@ -140,7 +140,7 @@ def wrap_into_triclinic(
 
 def _gen_relevant_images_triclinic(
     x: np.typing.ArrayLike,
-    center: np.typing.ArrayLike,
+    cell_center: np.typing.ArrayLike,
     cell_matrix: np.ndarray,
     distance_upper_bound: float = np.inf,
 ) -> np.ndarray:
@@ -150,8 +150,8 @@ def _gen_relevant_images_triclinic(
     ----------
     x : np.typing.ArrayLike
         An array of points.
-    center : np.typing.ArrayLike
-        A cell cetner coordinates.
+    cell_center : np.typing.ArrayLike
+        Cell center coordinates.
     cell_matrix : np.ndarray
         A matrix representation of the cell bounds.
     distance_upper_bound : float, optional
@@ -181,8 +181,8 @@ def _gen_relevant_images_triclinic(
         if norm > 0:
             plane_norms[i] = plane_norms[i] / norm
 
-    # Map x onto the canonical unit cell
-    real_x = wrap_into_triclinic(x, center, cell_matrix)
+    # Map x into given cell
+    real_x = wrap_into_triclinic(x, cell_center, cell_matrix)
     xs_to_try = [real_x]
 
     if distance_upper_bound <= 0:
@@ -303,10 +303,10 @@ class PeriodicKDTree(KDTree):
 
     Attributes
     ----------
-    bounds : np.typing.ArrayLike
+    cell_bounds : np.typing.ArrayLike
         Lengths along each axis and angles between the edges.
-    center : np.typing.ArrayLike
-        A cell center coordinates.
+    cell_center : np.typing.ArrayLike
+        Cell center coordinates.
     data : np.typing.ArrayLike
         The n data points of dimension m to index before wrapping.
         The array is not copied unless necessary.
@@ -318,8 +318,8 @@ class PeriodicKDTree(KDTree):
 
     def __init__(
         self,
-        bounds: np.typing.ArrayLike,
-        center: np.typing.ArrayLike,
+        cell_bounds: np.typing.ArrayLike,
+        cell_center: np.typing.ArrayLike,
         data: np.typing.ArrayLike,
         leafsize: int = 10,
     ) -> None:
@@ -327,10 +327,10 @@ class PeriodicKDTree(KDTree):
 
         Parameters
         ----------
-        bounds : np.typing.ArrayLike
+        cell_bounds : np.typing.ArrayLike
             Lengths along each axis and angles between the edges.
-        center : np.typing.ArrayLike
-            A cell cetner coordinates.
+        cell_center : np.typing.ArrayLike
+            Cell center coordinates.
         data : np.typing.ArrayLike
             The n data points of dimension m to index before wrapping.
             The array is not copied unless necessary.
@@ -339,16 +339,16 @@ class PeriodicKDTree(KDTree):
             by default 10
 
         """
+        self.cell_bounds = np.array(cell_bounds)
+        self.cell_center = np.array(cell_center)
+        self.data = np.asarray(data)
+        cell_matrix = cell_matrix_from_bounds(self.cell_bounds)
         # Map all points to canonical periodic image
-        self.bounds = np.array(bounds)
-        self.center = np.array(center)
-        self.real_data = np.asarray(data)
-        cell_matrix = cell_matrix_from_bounds(self.bounds)
-        wrapped_data = wrap_into_triclinic(self.real_data, self.center, cell_matrix)
+        wrapped_data = wrap_into_triclinic(self.data, self.cell_center, cell_matrix)
 
         # Calculate maximum distance_upper_bound
         self.max_distance_upper_bound = np.min(
-            np.where(self.bounds > 0, 0.5 * self.bounds, np.inf)
+            np.where(self.cell_bounds > 0, 0.5 * self.cell_bounds, np.inf)
         )
 
         # Set up underlying kd-tree
@@ -364,8 +364,10 @@ class PeriodicKDTree(KDTree):
 
         # Run queries over all relevant images of x
         results = []
-        cell_matrix = cell_matrix_from_bounds(self.bounds)
-        for real_x in _gen_relevant_images_triclinic(x, self.center, cell_matrix, r):
+        cell_matrix = cell_matrix_from_bounds(self.cell_bounds)
+        for real_x in _gen_relevant_images_triclinic(
+            x, self.cell_center, cell_matrix, r
+        ):
             results.extend(super().query_ball_point(real_x, r, p, eps, workers=workers))
         return results
 
