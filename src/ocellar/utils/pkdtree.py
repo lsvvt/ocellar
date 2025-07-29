@@ -55,42 +55,29 @@ def cell_matrix_from_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
     Returns
     -------
     cell_matrix : np.ndarray
-        A matrix representation of the cell bounds.
+        A matrix representation of the cell bounds of shape `(3,3)`,
+        where `cell_matrix[0]` corrsponds to first cell vector.
 
     """
-    lx = bounds[0]
-    ly = bounds[1]
-    lz = bounds[2]
-    if lx <= 0:
-        raise ValueError("Lenght along X axis must be > 0")
-    if ly <= 0:
-        raise ValueError("Lenght along Y axis must be > 0")
-    if lz <= 0:
-        raise ValueError("Lenght along Z axis must be > 0")
-    alpha = bounds[3]
-    beta = bounds[4]
-    gamma = bounds[5]
+    lx, ly, lz, alpha, beta, gamma = map(float, bounds)
 
-    if not (0 <= alpha <= 180) or not (0 <= beta <= 180) or not (0 <= gamma <= 180):
+    if (lx <= 0) or (ly <= 0) or (lz <= 0):
+        raise ValueError("Lenghts along all axes must be > 0")
+    if not (0 < alpha < 180) or not (0 < beta < 180) or not (0 < gamma < 180):
         raise ValueError("Angles between the edges must be in the range from 0 to 180")
 
-    cell_matrix = np.zeros((3, 3))
-    cell_matrix[0, 0] = lx
-    if alpha == 90.0:
-        cos_alpha = 0.0
-    else:
-        cos_alpha = np.cos(np.radians(alpha))
-    if beta == 90.0:
-        cos_beta = 0.0
-    else:
-        cos_beta = np.cos(np.radians(beta))
-    if gamma == 90.0:
+    cos_alpha = 0.0 if np.isclose(alpha, 90.0) else np.cos(np.radians(alpha))
+    cos_beta = 0.0 if np.isclose(beta, 90.0) else np.cos(np.radians(beta))
+    if np.isclose(gamma, 90.0):
         cos_gamma = 0.0
         sin_gamma = 1.0
     else:
         gamma = np.radians(gamma)
         cos_gamma = np.cos(gamma)
         sin_gamma = np.sin(gamma)
+
+    cell_matrix = np.zeros((3, 3))
+    cell_matrix[0, 0] = lx
     cell_matrix[1, 0] = ly * cos_gamma
     cell_matrix[1, 1] = ly * sin_gamma
     cell_matrix[2, 0] = lz * cos_beta
@@ -98,7 +85,6 @@ def cell_matrix_from_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
     cell_matrix[2, 2] = np.sqrt(
         lz * lz - cell_matrix[2, 0] ** 2 - cell_matrix[2, 1] ** 2
     )
-
     return cell_matrix
 
 
