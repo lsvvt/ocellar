@@ -46,6 +46,253 @@ def _gen_relevant_images(x, bounds, distance_upper_bound):
     return xs_to_try
 
 
+def build_matrix_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
+    """Build a matrix representation of the cell bounds.
+
+    Parameters
+    ----------
+        bounds : np.typing.ArrayLike
+            6 values of the cell boundary coordinates and 3 angles between the edges
+
+    Returns
+    -------
+        cell_matrix : np.ndarray
+            A matrix representation of the cell bounds.
+
+    """
+    lx = bounds[0]
+    ly = bounds[1]
+    lz = bounds[2]
+    if lx <= 0:
+        raise ValueError("Lenght along X axis must be > 0")
+    if ly <= 0:
+        raise ValueError("Lenght along Y axis must be > 0")
+    if lz <= 0:
+        raise ValueError("Lenght along Z axis must be > 0")
+    alpha = bounds[3]
+    beta = bounds[4]
+    gamma = bounds[5]
+
+    if not (0 <= alpha <= 180) or not (0 <= beta <= 180) or not (0 <= gamma <= 180):
+        raise ValueError("Angles between the edges must be in the range from 0 to 180")
+
+    cell_matrix = np.zeros((3, 3))
+    cell_matrix[0, 0] = lx
+    if alpha == 90.0:
+        cos_alpha = 0.0
+    else:
+        cos_alpha = np.cos(np.radians(alpha))
+    if beta == 90.0:
+        cos_beta = 0.0
+    else:
+        cos_beta = np.cos(np.radians(beta))
+    if gamma == 90.0:
+        cos_gamma = 0.0
+        sin_gamma = 1.0
+    else:
+        gamma = np.radians(gamma)
+        cos_gamma = np.cos(gamma)
+        sin_gamma = np.sin(gamma)
+    cell_matrix[1, 0] = ly * cos_gamma
+    cell_matrix[1, 1] = ly * sin_gamma
+    cell_matrix[2, 0] = lz * cos_beta
+    cell_matrix[2, 1] = lz * (cos_alpha - cos_beta * cos_gamma) / sin_gamma
+    cell_matrix[2, 2] = np.sqrt(
+        lz * lz - cell_matrix[2, 0] ** 2 - cell_matrix[2, 1] ** 2
+    )
+
+    return cell_matrix
+
+
+def wrap_into_triclinic(
+    x: np.typing.ArrayLike, center: np.typing.ArrayLike, cell_matrix: np.ndarray
+) -> np.ndarray:
+    """Wrap x into the canonical unit triclinic cell.
+
+    Parameters
+    ----------
+    x : np.typing.ArrayLike
+        An array of points.
+    center : np.typing.ArrayLike
+        A cell cetner coordinates.
+    cell_matrix : np.ndarray
+        A matrix representation of the cell bounds.
+
+    Returns
+    -------
+    x_canonical : np.ndarray
+        Coordinates of the x point into the triclinic cell
+
+    """
+    center_x = x - center
+    box_vectors_matrix = cell_matrix.T
+    box_vectors_matrix_inv = np.linalg.inv(box_vectors_matrix)
+    r = center_x.T
+
+    f = np.dot(box_vectors_matrix_inv, r)
+    g = np.zeros(3)
+    for i in range(3):
+        g[i] = f.T[i] - np.floor(f.T[i])
+
+    x_canonical_center = np.dot(box_vectors_matrix, g.T)
+    x_canonical = x_canonical_center.T + center
+
+    return x_canonical
+
+
+def gen_relevant_images_for_triclinic_cell(
+    x: np.typing.ArrayLike,
+    center: np.typing.ArrayLike,
+    cell_matrix: np.ndarray,
+    distance_upper_bound: float = np.inf,
+) -> np.ndarray:
+    """Produce the mirror images of x coordinates.
+
+    Parameters
+    ----------
+    x : np.typing.ArrayLike
+        An array of points.
+    center : np.typing.ArrayLike
+        A cell cetner coordinates.
+    cell_matrix : np.ndarray
+        A matrix representation of the cell bounds.
+    distance_upper_bound : float, optional
+        Distance of x mirror images generation. Must be >= 0
+
+    Returns
+    -------
+    xs_to_try : np.ndarray
+        Coordinates of the mirror images.
+
+    """
+    # Calculate shifts for each axis
+
+    shiftX = cell_matrix[0]
+    shiftY = cell_matrix[1]
+    shiftZ = cell_matrix[2]
+    end = cell_matrix[0] + cell_matrix[1] + cell_matrix[2]
+    # Calculate reciprocal vectors
+    reciprocal = np.zeros((3, 3))
+    reciprocal[0] = np.cross(cell_matrix[1], cell_matrix[2])
+    reciprocal[1] = np.cross(cell_matrix[2], cell_matrix[0])
+    reciprocal[2] = np.cross(cell_matrix[0], cell_matrix[1])
+
+    # Normalize
+    for i in range(3):
+        norm = np.linalg.norm(reciprocal[i])
+        if norm > 0:
+            reciprocal[i] = reciprocal[i] / norm
+
+    # Map x onto the canonical unit cell
+    real_x = wrap_into_triclinic(x, center, cell_matrix)
+    xs_to_try = [real_x]
+
+    if distance_upper_bound <= 0:
+        raise ValueError("Distance upper bound must be > 0")
+
+    if distance_upper_bound == np.inf:
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                for dz in [-1, 0, 1]:
+                    if dx == 0 and dy == 0 and dz == 0:
+                        continue
+                    mirror_image = real_x + dx * shiftX + dy * shiftY + dz * shiftZ
+                    xs_to_try.append(mirror_image)
+
+    else:
+        coord = real_x
+        other = end - coord
+
+        # identify the condition
+        lo_x = np.dot(coord, reciprocal[0]) <= distance_upper_bound
+        hi_x = np.dot(other, reciprocal[0]) <= distance_upper_bound
+        lo_y = np.dot(coord, reciprocal[1]) <= distance_upper_bound
+        hi_y = np.dot(other, reciprocal[1]) <= distance_upper_bound
+        lo_z = np.dot(coord, reciprocal[2]) <= distance_upper_bound
+        hi_z = np.dot(other, reciprocal[2]) <= distance_upper_bound
+
+        # Calculate mirror images coordinates depending on proximity to the edge
+        if lo_x:
+            xs_to_try.append(coord + shiftX)
+
+            if lo_y:
+                xs_to_try.append(coord + shiftX + shiftY)
+
+                if lo_z:
+                    xs_to_try.append(coord + shiftX + shiftY + shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord + shiftX + shiftY - shiftZ)
+
+            elif hi_y:
+                xs_to_try.append(coord + shiftX - shiftY)
+
+                if lo_z:
+                    xs_to_try.append(coord + shiftX - shiftY + shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord + shiftX - shiftY - shiftZ)
+
+            if lo_z:
+                xs_to_try.append(coord + shiftX + shiftZ)
+
+            elif hi_z:
+                xs_to_try.append(coord + shiftX - shiftZ)
+
+        elif hi_x:
+            xs_to_try.append(coord - shiftX)
+
+            if lo_y:
+                xs_to_try.append(coord - shiftX + shiftY)
+
+                if lo_z:
+                    xs_to_try.append(coord - shiftX + shiftY + shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord - shiftX + shiftY - shiftZ)
+
+            elif hi_y:
+                xs_to_try.append(coord - shiftX - shiftY)
+
+                if lo_z:
+                    xs_to_try.append(coord - shiftX - shiftY + shiftZ)
+
+                elif hi_z:
+                    xs_to_try.append(coord - shiftX - shiftY - shiftZ)
+
+            if lo_z:
+                xs_to_try.append(coord - shiftX + shiftZ)
+
+            elif hi_z:
+                xs_to_try.append(coord - shiftX - shiftZ)
+
+        if lo_y:
+            xs_to_try.append(coord + shiftY)
+
+            if lo_z:
+                xs_to_try.append(coord + shiftY + shiftZ)
+
+            elif hi_z:
+                xs_to_try.append(coord + shiftY - shiftZ)
+
+        elif hi_y:
+            xs_to_try.append(coord - shiftY)
+
+            if lo_z:
+                xs_to_try.append(coord - shiftY + shiftZ)
+
+            elif hi_z:
+                xs_to_try.append(coord - shiftY - shiftZ)
+
+        if lo_z:
+            xs_to_try.append(coord + shiftZ)
+
+        elif hi_z:
+            xs_to_try.append(coord - shiftZ)
+
+    return xs_to_try
+
+
 class PeriodicKDTree(KDTree):
     """Cython kd-tree for quick nearest-neighbor lookup with periodic boundaries.
 
@@ -65,8 +312,9 @@ class PeriodicKDTree(KDTree):
     Attributes
     ----------
     bounds : np.typing.ArrayLike
-        Period lengths along each axis. A non-positive value disables
-        periodicity on that axis.
+        Lengths along each axis and angles between the edges.
+    center : np.typing.ArrayLike
+        A cell center coordinates.
     data : np.typing.ArrayLike
         The n data points of dimension m to index before wrapping.
         The array is not copied unless necessary.
@@ -77,15 +325,20 @@ class PeriodicKDTree(KDTree):
     """
 
     def __init__(
-        self, bounds: np.typing.ArrayLike, data: np.typing.ArrayLike, leafsize: int = 10
+        self,
+        bounds: np.typing.ArrayLike,
+        center: np.typing.ArrayLike,
+        data: np.typing.ArrayLike,
+        leafsize: int = 10,
     ) -> None:
         """Initialize PeriodicKDTree.
 
         Parameters
         ----------
         bounds : np.typing.ArrayLike
-            Period lengths along each axis. A non-positive value disables
-            periodicity on that axis.
+            Lengths along each axis and angles between the edges.
+        center : np.typing.ArrayLike
+            A cell cetner coordinates.
         data : np.typing.ArrayLike
             The n data points of dimension m to index before wrapping.
             The array is not copied unless necessary.
@@ -96,10 +349,10 @@ class PeriodicKDTree(KDTree):
         """
         # Map all points to canonical periodic image
         self.bounds = np.array(bounds)
+        self.center = np.array(center)
         self.real_data = np.asarray(data)
-        wrapped_data = self.real_data - np.where(
-            bounds > 0.0, (np.floor(self.real_data / bounds) * bounds), 0.0
-        )
+        cell_matrix = build_matrix_bounds(self.bounds)
+        wrapped_data = wrap_into_triclinic(self.real_data, self.center, cell_matrix)
 
         # Calculate maximum distance_upper_bound
         self.max_distance_upper_bound = np.min(
@@ -270,7 +523,10 @@ class PeriodicKDTree(KDTree):
 
         # Run queries over all relevant images of x
         results = []
-        for real_x in _gen_relevant_images(x, self.bounds, r):
+        cell_matrix = build_matrix_bounds(self.bounds)
+        for real_x in gen_relevant_images_for_triclinic_cell(
+            x, self.center, cell_matrix, r
+        ):
             results.extend(super().query_ball_point(real_x, r, p, eps, workers=workers))
         return results
 
