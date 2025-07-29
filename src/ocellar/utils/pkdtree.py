@@ -4,7 +4,6 @@ Modified to work with triclinic cells by Angelica Yakubinskaya and Ilya Ivanov.
 See https://github.com/patvarilly/periodic_kdtree.
 """
 
-import heapq
 import itertools
 
 import numpy as np
@@ -139,7 +138,7 @@ def wrap_into_triclinic(
     return x_canonical
 
 
-def gen_relevant_images_for_triclinic_cell(
+def gen_relevant_images_triclinic(
     x: np.typing.ArrayLike,
     center: np.typing.ArrayLike,
     cell_matrix: np.ndarray,
@@ -165,22 +164,22 @@ def gen_relevant_images_for_triclinic_cell(
 
     """
     # Calculate shifts for each axis
-
     shiftX = cell_matrix[0]
     shiftY = cell_matrix[1]
     shiftZ = cell_matrix[2]
     end = cell_matrix[0] + cell_matrix[1] + cell_matrix[2]
-    # Calculate reciprocal vectors
-    reciprocal = np.zeros((3, 3))
-    reciprocal[0] = np.cross(cell_matrix[1], cell_matrix[2])
-    reciprocal[1] = np.cross(cell_matrix[2], cell_matrix[0])
-    reciprocal[2] = np.cross(cell_matrix[0], cell_matrix[1])
+
+    # Calculate plane norm vectors
+    plane_norms = np.zeros((3, 3))
+    plane_norms[0] = np.cross(cell_matrix[1], cell_matrix[2])
+    plane_norms[1] = np.cross(cell_matrix[2], cell_matrix[0])
+    plane_norms[2] = np.cross(cell_matrix[0], cell_matrix[1])
 
     # Normalize
     for i in range(3):
-        norm = np.linalg.norm(reciprocal[i])
+        norm = np.linalg.norm(plane_norms[i])
         if norm > 0:
-            reciprocal[i] = reciprocal[i] / norm
+            plane_norms[i] = plane_norms[i] / norm
 
     # Map x onto the canonical unit cell
     real_x = wrap_into_triclinic(x, center, cell_matrix)
@@ -203,12 +202,12 @@ def gen_relevant_images_for_triclinic_cell(
         other = end - coord
 
         # identify the condition
-        lo_x = np.dot(coord, reciprocal[0]) <= distance_upper_bound
-        hi_x = np.dot(other, reciprocal[0]) <= distance_upper_bound
-        lo_y = np.dot(coord, reciprocal[1]) <= distance_upper_bound
-        hi_y = np.dot(other, reciprocal[1]) <= distance_upper_bound
-        lo_z = np.dot(coord, reciprocal[2]) <= distance_upper_bound
-        hi_z = np.dot(other, reciprocal[2]) <= distance_upper_bound
+        lo_x = np.dot(coord, plane_norms[0]) <= distance_upper_bound
+        hi_x = np.dot(other, plane_norms[0]) <= distance_upper_bound
+        lo_y = np.dot(coord, plane_norms[1]) <= distance_upper_bound
+        hi_y = np.dot(other, plane_norms[1]) <= distance_upper_bound
+        lo_z = np.dot(coord, plane_norms[2]) <= distance_upper_bound
+        hi_z = np.dot(other, plane_norms[2]) <= distance_upper_bound
 
         # Calculate mirror images coordinates depending on proximity to the edge
         if lo_x:
@@ -219,7 +218,6 @@ def gen_relevant_images_for_triclinic_cell(
 
                 if lo_z:
                     xs_to_try.append(coord + shiftX + shiftY + shiftZ)
-
                 elif hi_z:
                     xs_to_try.append(coord + shiftX + shiftY - shiftZ)
 
@@ -228,7 +226,6 @@ def gen_relevant_images_for_triclinic_cell(
 
                 if lo_z:
                     xs_to_try.append(coord + shiftX - shiftY + shiftZ)
-
                 elif hi_z:
                     xs_to_try.append(coord + shiftX - shiftY - shiftZ)
 
@@ -246,7 +243,6 @@ def gen_relevant_images_for_triclinic_cell(
 
                 if lo_z:
                     xs_to_try.append(coord - shiftX + shiftY + shiftZ)
-
                 elif hi_z:
                     xs_to_try.append(coord - shiftX + shiftY - shiftZ)
 
@@ -255,7 +251,6 @@ def gen_relevant_images_for_triclinic_cell(
 
                 if lo_z:
                     xs_to_try.append(coord - shiftX - shiftY + shiftZ)
-
                 elif hi_z:
                     xs_to_try.append(coord - shiftX - shiftY - shiftZ)
 
@@ -270,7 +265,6 @@ def gen_relevant_images_for_triclinic_cell(
 
             if lo_z:
                 xs_to_try.append(coord + shiftY + shiftZ)
-
             elif hi_z:
                 xs_to_try.append(coord + shiftY - shiftZ)
 
@@ -279,7 +273,6 @@ def gen_relevant_images_for_triclinic_cell(
 
             if lo_z:
                 xs_to_try.append(coord - shiftY + shiftZ)
-
             elif hi_z:
                 xs_to_try.append(coord - shiftY - shiftZ)
 
@@ -361,171 +354,18 @@ class PeriodicKDTree(KDTree):
         # Set up underlying kd-tree
         super().__init__(wrapped_data, leafsize)
 
-    # Ideally, KDTree and cKDTree would expose identical query and __query
-    # interfaces.  But they don't, and cKDTree.__query is also inaccessible
-    # from Python.  We do our best here to cope.
-    def __query(self, x, k=1, eps=0, p=2, distance_upper_bound=np.inf, workers=1):
-        # This is the internal query method, which guarantees that x
-        # is a single point, not an array of points
-        #
-        # A slight complication: k could be "None", which means "return
-        # all neighbors within the given distance_upper_bound".
-
-        # Cap distance_upper_bound
-        distance_upper_bound = np.min(
-            [distance_upper_bound, self.max_distance_upper_bound]
-        )
-
-        # Run queries over all relevant images of x
-        hits_list = []
-        for real_x in _gen_relevant_images(x, self.bounds, distance_upper_bound):
-            d, i = super().query(
-                real_x, k, eps, p, distance_upper_bound, workers=workers
-            )
-            if k > 1:
-                hits_list.append(list(zip(d, i, strict=True)))
-            else:
-                hits_list.append([(d, i)])
-
-        # Now merge results
-        if k > 1:
-            return heapq.nsmallest(k, itertools.chain(*hits_list))
-        elif k == 1:
-            return [min(itertools.chain(*hits_list))]
-        else:
-            raise ValueError("Invalid k in periodic_kdtree._KDTree__query")
-
-    def query(
-        self,
-        x: np.typing.ArrayLike,
-        k: int = 1,
-        eps: float = 0,
-        p: float = 2,
-        distance_upper_bound: float = np.inf,
-    ):
-        r"""Query the kd-tree for nearest neighbors.
-
-        Parameters
-        ----------
-        x : array_like, last dimension self.m
-            An array of points to query.
-        k : int or Sequence[int], optional
-            Either the number of nearest neighbors to return, or a list of the
-            k-th nearest neighbors to return, starting from 1.
-        eps : nonnegative float, optional
-            Return approximate nearest neighbors; the kth returned value
-            is guaranteed to be no further than (1+eps) times the
-            distance to the real kth nearest neighbor.
-        p : float, 1<=p<=infinity, optional
-            Which Minkowski p-norm to use.
-            1 is the sum-of-absolute-values distance ("Manhattan" distance).
-            2 is the usual Euclidean distance.
-            infinity is the maximum-coordinate-difference distance.
-            A large, finite p may cause a ValueError if overflow can occur.
-        distance_upper_bound : nonnegative float, optional
-            Return only neighbors within this distance. This is used to prune
-            tree searches, so if you are doing a series of nearest-neighbor
-            queries, it may help to supply the distance to the nearest neighbor
-            of the most recent point.
-
-
-        Returns
-        -------
-        d : float or array of floats
-            The distances to the nearest neighbors.
-            If ``x`` has shape ``tuple+(self.m,)``, then ``d`` has shape
-            ``tuple+(k,)``.
-            When k == 1, the last dimension of the output is squeezed.
-            Missing neighbors are indicated with infinite distances.
-            Hits are sorted by distance (nearest first).
-
-        i : integer or array of integers
-            The index of each neighbor in ``self.data``.
-            ``i`` is the same shape as d.
-            Missing neighbors are indicated with ``self.n``.
+    def __query_ball_point(self, x, r, p=2.0, eps=0, workers=1) -> list:
+        """Internal query method, which guarantees that x
+        is a single point, not an array of points.
 
         """
-        x = np.asarray(x)
-        if np.shape(x)[-1] != self.m:
-            raise ValueError(
-                "x must consist of vectors of length %d "
-                "but has shape %s" % (self.m, np.shape(x))
-            )
-        if p < 1:
-            raise ValueError("Only p-norms with 1<=p<=infinity permitted")
-        retshape = np.shape(x)[:-1]
-        if retshape != ():
-            if k > 1:
-                dd = np.empty(retshape + (k,), dtype=np.float)
-                dd.fill(np.inf)
-                ii = np.empty(retshape + (k,), dtype=np.int)
-                ii.fill(self.n)
-            elif k == 1:
-                dd = np.empty(retshape, dtype=np.float)
-                dd.fill(np.inf)
-                ii = np.empty(retshape, dtype=np.int)
-                ii.fill(self.n)
-            else:
-                raise ValueError(
-                    "Requested %s nearest neighbors; "
-                    "acceptable numbers are "
-                    "integers greater than or equal "
-                    "to one, or None"
-                )
-            for c in np.ndindex(retshape):
-                hits = self.__query(
-                    x[c], k=k, eps=eps, p=p, distance_upper_bound=distance_upper_bound
-                )
-                if k > 1:
-                    for j in range(len(hits)):
-                        dd[c + (j,)], ii[c + (j,)] = hits[j]
-                elif k == 1:
-                    if len(hits) > 0:
-                        dd[c], ii[c] = hits[0]
-                    else:
-                        dd[c] = np.inf
-                        ii[c] = self.n
-            return dd, ii
-        else:
-            hits = self.__query(
-                x, k=k, eps=eps, p=p, distance_upper_bound=distance_upper_bound
-            )
-            if k == 1:
-                if len(hits) > 0:
-                    return hits[0]
-                else:
-                    return np.inf, self.n
-            elif k > 1:
-                dd = np.empty(k, dtype=np.float)
-                dd.fill(np.inf)
-                ii = np.empty(k, dtype=np.int)
-                ii.fill(self.n)
-                for j in range(len(hits)):
-                    dd[j], ii[j] = hits[j]
-                return dd, ii
-            else:
-                raise ValueError(
-                    "Requested %s nearest neighbors; "
-                    "acceptable numbers are integers greater "
-                    "than or equal to one, or None"
-                )
-
-    # Ideally, KDTree and cKDTree would expose identical __query_ball_point
-    # interfaces.  But they don't, and cKDTree.__query_ball_point is also
-    # inaccessible from Python.  We do our best here to cope.
-    def __query_ball_point(self, x, r, p=2.0, eps=0, workers=1):
-        # This is the internal query method, which guarantees that x
-        # is a single point, not an array of points
-
         # Cap r
         r = min(r, self.max_distance_upper_bound)
 
         # Run queries over all relevant images of x
         results = []
         cell_matrix = cell_matrix_from_bounds(self.bounds)
-        for real_x in gen_relevant_images_for_triclinic_cell(
-            x, self.center, cell_matrix, r
-        ):
+        for real_x in gen_relevant_images_triclinic(x, self.center, cell_matrix, r):
             results.extend(super().query_ball_point(real_x, r, p, eps, workers=workers))
         return results
 
@@ -565,19 +405,3 @@ class PeriodicKDTree(KDTree):
             for c in np.ndindex(retshape):
                 result[c] = self.__query_ball_point(x[c], r, p, eps, workers)
             return result
-
-    def query_ball_tree(self, other, r, p=2.0, eps=0):
-        """"""
-        raise NotImplementedError()
-
-    def query_pairs(self, r, p=2.0, eps=0):
-        """"""
-        raise NotImplementedError()
-
-    def count_neighbors(self, other, r, p=2.0):
-        """"""
-        raise NotImplementedError()
-
-    def sparse_distance_matrix(self, other, max_distance, p=2.0):
-        """"""
-        raise NotImplementedError()
