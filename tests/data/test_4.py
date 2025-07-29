@@ -28,7 +28,7 @@ test_distance_upper_bound = [5, 3, 5, 5, 5, 4, 2]
 def test_duplicate(bounds, x, distance_upper_bound):
     bounds_matrix = pkdtree.cell_matrix_from_bounds(bounds)
     real_x = pkdtree.map_x_onto_canonical_unit_cell(x, bounds, bounds_matrix)
-    mirror_images = pkdtree.gen_relevant_images_triclinic(real_x, bounds_matrix, distance_upper_bound)
+    mirror_images = pkdtree._gen_relevant_images_triclinic(real_x, bounds_matrix, distance_upper_bound)
 
     for mirror_image in mirror_images:
         assert eval(mirror_image) == x

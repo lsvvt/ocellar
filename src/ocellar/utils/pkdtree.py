@@ -138,7 +138,7 @@ def wrap_into_triclinic(
     return x_canonical
 
 
-def gen_relevant_images_triclinic(
+def _gen_relevant_images_triclinic(
     x: np.typing.ArrayLike,
     center: np.typing.ArrayLike,
     cell_matrix: np.ndarray,
@@ -365,7 +365,7 @@ class PeriodicKDTree(KDTree):
         # Run queries over all relevant images of x
         results = []
         cell_matrix = cell_matrix_from_bounds(self.bounds)
-        for real_x in gen_relevant_images_triclinic(x, self.center, cell_matrix, r):
+        for real_x in _gen_relevant_images_triclinic(x, self.center, cell_matrix, r):
             results.extend(super().query_ball_point(real_x, r, p, eps, workers=workers))
         return results
 
