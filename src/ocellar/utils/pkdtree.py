@@ -89,7 +89,7 @@ def cell_matrix_from_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
 
 
 def wrap_into_triclinic(
-    x: np.typing.ArrayLike, center: np.typing.ArrayLike, cell_matrix: np.ndarray
+    x: np.typing.ArrayLike, cell_center: np.typing.ArrayLike, cell_matrix: np.ndarray
 ) -> np.ndarray:
     """Wrap x into the canonical unit triclinic cell.
 
@@ -97,31 +97,23 @@ def wrap_into_triclinic(
     ----------
     x : np.typing.ArrayLike
         An array of points.
-    center : np.typing.ArrayLike
-        A cell cetner coordinates.
+    cell_center : np.typing.ArrayLike
+        Cell center coordinates.
     cell_matrix : np.ndarray
         A matrix representation of the cell bounds.
 
     Returns
     -------
-    x_canonical : np.ndarray
+    x_wrapped : np.ndarray
         Coordinates of the x point into the triclinic cell
 
     """
-    center_x = x - center
-    box_vectors_matrix = cell_matrix.T
-    box_vectors_matrix_inv = np.linalg.inv(box_vectors_matrix)
-    r = center_x.T
+    cell_col = np.asarray(cell_matrix).T  # convert to columns
+    cell_inv = np.linalg.inv(cell_col)
+    frac = np.mod((x - cell_center) @ cell_inv, 1)
+    x_wrapped = frac @ cell_col + cell_center
 
-    f = np.dot(box_vectors_matrix_inv, r)
-    g = np.zeros(3)
-    for i in range(3):
-        g[i] = f.T[i] - np.floor(f.T[i])
-
-    x_canonical_center = np.dot(box_vectors_matrix, g.T)
-    x_canonical = x_canonical_center.T + center
-
-    return x_canonical
+    return x_wrapped
 
 
 def _gen_relevant_images_triclinic(
