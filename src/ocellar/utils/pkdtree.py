@@ -354,11 +354,17 @@ class PeriodicKDTree(KDTree):
         # Set up underlying kd-tree
         super().__init__(wrapped_data, leafsize)
 
-    def __query_ball_point(self, x, r, p=2.0, eps=0, workers=1) -> list:
+    def __query_ball_point(
+        self,
+        x: np.typing.ArrayLike,
+        r: float,
+        p: float = 2.0,
+        eps: float = 0.0,
+        workers: int = 1,
+    ) -> list[int]:
         """Internal query method, which guarantees that x
         is a single point, not an array of points.
-
-        """
+        """  # noqa: D205, D401
         # Cap r
         r = min(r, self.max_distance_upper_bound)
 
@@ -371,26 +377,38 @@ class PeriodicKDTree(KDTree):
             results.extend(super().query_ball_point(real_x, r, p, eps, workers=workers))
         return results
 
-    def query_ball_point(self, x, r, p=2.0, eps=0, workers=1):
+    def query_ball_point(
+        self,
+        x: np.typing.ArrayLike,
+        r: float,
+        p: float = 2.0,
+        eps: float = 0.0,
+        workers: int = 1,
+    ) -> list[int] | np.ndarray:
         """Find all points within distance r of point(s) x.
 
-        :arg x: array_like, shape tuple + (self.m,)
-            The point or points to search for neighbors of.
-        :arg r: positive float
-            The radius of points to return.
-        :arg p: float, optional
-            Which Minkowski p-norm to use.  Should be in the range [1, inf].
-        :arg eps: nonnegative float, optional
-            Approximate search. Branches of the tree are not explored if their
-            nearest points are further than ``r / (1 + eps)``, and branches are
-            added in bulk if their furthest points are nearer than
-            ``r * (1 + eps)``.
+        Parameters
+        ----------
+        x : ArrayLike, shape (..., m)
+            The point or points to search for neighbours of; last dimension
+            must match dimensions of bounds.
+        r : float
+            Positive radius within which to return points.
+        p : float, optional
+            Minkowski norm p, in range [1, ∞].  Defaults to 2.0 (Euclidean).
+        eps : float, optional
+            Approximate search tolerance: branches are pruned if nearer than
+            r/(1 + eps) or added if further than r*(1 + eps).
+        workers : int, optional
+            The number of parallel workers to use. Defaults to 1.
 
-        :returns: list or array of lists
-            If `x` is a single point, returns a list of the indices of the
-            neighbors of `x`. If `x` is an array of points, returns an object
-            array of shape tuple containing lists of neighbors.
-
+        Returns
+        -------
+        neighbours : list of int or ndarray of lists
+            If `x` is a single point (shape (m,)), returns a list of neighbour
+            indices. If `x` has shape (..., m), returns an object array of
+            shape `x.shape[:-1]` where each element is a list of neighbour
+            indices.
 
         """
         x = np.asarray(x).astype(np.float32)
