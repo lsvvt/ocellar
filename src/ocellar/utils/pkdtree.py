@@ -1,8 +1,7 @@
-"""The periodicKDTree class written by Patrick Varilly.
+"""The periodicKDTree class initially written by Patrick Varilly.
 
-Some minor modifications were done to make it work with Python 3
-
-See https://github.com/patvarilly/periodic_kdtree
+Modified to work with triclinic cells by Angelica Yakubinskaya and Ilya Ivanov.
+See https://github.com/patvarilly/periodic_kdtree.
 """
 
 import heapq
@@ -46,18 +45,18 @@ def _gen_relevant_images(x, bounds, distance_upper_bound):
     return xs_to_try
 
 
-def build_matrix_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
+def cell_matrix_from_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
     """Build a matrix representation of the cell bounds.
 
     Parameters
     ----------
-        bounds : np.typing.ArrayLike
-            6 values of the cell boundary coordinates and 3 angles between the edges
+    bounds : np.typing.ArrayLike
+        3 values of the cell boundary lengths and 3 angles between the edges
 
     Returns
     -------
-        cell_matrix : np.ndarray
-            A matrix representation of the cell bounds.
+    cell_matrix : np.ndarray
+        A matrix representation of the cell bounds.
 
     """
     lx = bounds[0]
@@ -351,7 +350,7 @@ class PeriodicKDTree(KDTree):
         self.bounds = np.array(bounds)
         self.center = np.array(center)
         self.real_data = np.asarray(data)
-        cell_matrix = build_matrix_bounds(self.bounds)
+        cell_matrix = cell_matrix_from_bounds(self.bounds)
         wrapped_data = wrap_into_triclinic(self.real_data, self.center, cell_matrix)
 
         # Calculate maximum distance_upper_bound
@@ -523,7 +522,7 @@ class PeriodicKDTree(KDTree):
 
         # Run queries over all relevant images of x
         results = []
-        cell_matrix = build_matrix_bounds(self.bounds)
+        cell_matrix = cell_matrix_from_bounds(self.bounds)
         for real_x in gen_relevant_images_for_triclinic_cell(
             x, self.center, cell_matrix, r
         ):
