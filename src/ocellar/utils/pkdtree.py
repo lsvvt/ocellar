@@ -4,44 +4,8 @@ Modified to work with triclinic cells by Angelica Yakubinskaya and Ilya Ivanov.
 See https://github.com/patvarilly/periodic_kdtree.
 """
 
-import itertools
-
 import numpy as np
 from scipy.spatial import KDTree
-
-
-def _gen_relevant_images(x, bounds, distance_upper_bound):
-    # Map x onto the canonical unit cell, then produce the relevant
-    # mirror images
-    real_x = x - np.where(bounds > 0.0, np.floor(x / bounds) * bounds, 0.0)
-    m = len(x)
-
-    xs_to_try = [real_x]
-    for i in range(m):
-        if bounds[i] > 0.0:
-            disp = np.zeros(m)
-            disp[i] = bounds[i]
-
-            if distance_upper_bound == np.inf:
-                xs_to_try = list(
-                    itertools.chain.from_iterable(
-                        (_ + disp, _, _ - disp) for _ in xs_to_try
-                    )
-                )
-            else:
-                extra_xs = []
-
-                # Point near lower boundary, include image on upper side
-                if abs(real_x[i]) < distance_upper_bound:
-                    extra_xs.extend(_ + disp for _ in xs_to_try)
-
-                # Point near upper boundary, include image on lower side
-                if abs(bounds[i] - real_x[i]) < distance_upper_bound:
-                    extra_xs.extend(_ - disp for _ in xs_to_try)
-
-                xs_to_try.extend(extra_xs)
-
-    return xs_to_try
 
 
 def cell_matrix_from_bounds(bounds: np.typing.ArrayLike) -> np.ndarray:
@@ -108,9 +72,10 @@ def wrap_into_triclinic(
         Coordinates of the x point into the triclinic cell
 
     """
-    cell_col = np.asarray(cell_matrix).T  # convert to columns
+    cell_col = np.asarray(cell_matrix)  # convert to columns
     cell_inv = np.linalg.inv(cell_col)
-    frac = np.mod((x - cell_center) @ cell_inv, 1)
+    frac = (x - cell_center) @ cell_inv
+    frac -= np.floor(frac)
     x_wrapped = frac @ cell_col + cell_center
 
     return x_wrapped
@@ -142,9 +107,9 @@ def _gen_relevant_images_triclinic(
 
     """
     # Calculate shifts for each axis
-    shiftX = cell_matrix[0]
-    shiftY = cell_matrix[1]
-    shiftZ = cell_matrix[2]
+    shift_x = cell_matrix[0]
+    shift_y = cell_matrix[1]
+    shift_z = cell_matrix[2]
     end = cell_matrix[0] + cell_matrix[1] + cell_matrix[2]
 
     # Calculate plane norm vectors
@@ -172,7 +137,7 @@ def _gen_relevant_images_triclinic(
                 for dz in [-1, 0, 1]:
                     if dx == 0 and dy == 0 and dz == 0:
                         continue
-                    mirror_image = real_x + dx * shiftX + dy * shiftY + dz * shiftZ
+                    mirror_image = real_x + dx * shift_x + dy * shift_y + dz * shift_z
                     xs_to_try.append(mirror_image)
 
     else:
@@ -189,76 +154,76 @@ def _gen_relevant_images_triclinic(
 
         # Calculate mirror images coordinates depending on proximity to the edge
         if lo_x:
-            xs_to_try.append(coord + shiftX)
+            xs_to_try.append(coord + shift_x)
 
             if lo_y:
-                xs_to_try.append(coord + shiftX + shiftY)
+                xs_to_try.append(coord + shift_x + shift_y)
 
                 if lo_z:
-                    xs_to_try.append(coord + shiftX + shiftY + shiftZ)
+                    xs_to_try.append(coord + shift_x + shift_y + shift_z)
                 elif hi_z:
-                    xs_to_try.append(coord + shiftX + shiftY - shiftZ)
+                    xs_to_try.append(coord + shift_x + shift_y - shift_z)
 
             elif hi_y:
-                xs_to_try.append(coord + shiftX - shiftY)
+                xs_to_try.append(coord + shift_x - shift_y)
 
                 if lo_z:
-                    xs_to_try.append(coord + shiftX - shiftY + shiftZ)
+                    xs_to_try.append(coord + shift_x - shift_y + shift_z)
                 elif hi_z:
-                    xs_to_try.append(coord + shiftX - shiftY - shiftZ)
+                    xs_to_try.append(coord + shift_x - shift_y - shift_z)
 
             if lo_z:
-                xs_to_try.append(coord + shiftX + shiftZ)
+                xs_to_try.append(coord + shift_x + shift_z)
 
             elif hi_z:
-                xs_to_try.append(coord + shiftX - shiftZ)
+                xs_to_try.append(coord + shift_x - shift_z)
 
         elif hi_x:
-            xs_to_try.append(coord - shiftX)
+            xs_to_try.append(coord - shift_x)
 
             if lo_y:
-                xs_to_try.append(coord - shiftX + shiftY)
+                xs_to_try.append(coord - shift_x + shift_y)
 
                 if lo_z:
-                    xs_to_try.append(coord - shiftX + shiftY + shiftZ)
+                    xs_to_try.append(coord - shift_x + shift_y + shift_z)
                 elif hi_z:
-                    xs_to_try.append(coord - shiftX + shiftY - shiftZ)
+                    xs_to_try.append(coord - shift_x + shift_y - shift_z)
 
             elif hi_y:
-                xs_to_try.append(coord - shiftX - shiftY)
+                xs_to_try.append(coord - shift_x - shift_y)
 
                 if lo_z:
-                    xs_to_try.append(coord - shiftX - shiftY + shiftZ)
+                    xs_to_try.append(coord - shift_x - shift_y + shift_z)
                 elif hi_z:
-                    xs_to_try.append(coord - shiftX - shiftY - shiftZ)
+                    xs_to_try.append(coord - shift_x - shift_y - shift_z)
 
             if lo_z:
-                xs_to_try.append(coord - shiftX + shiftZ)
+                xs_to_try.append(coord - shift_x + shift_z)
 
             elif hi_z:
-                xs_to_try.append(coord - shiftX - shiftZ)
+                xs_to_try.append(coord - shift_x - shift_z)
 
         if lo_y:
-            xs_to_try.append(coord + shiftY)
+            xs_to_try.append(coord + shift_y)
 
             if lo_z:
-                xs_to_try.append(coord + shiftY + shiftZ)
+                xs_to_try.append(coord + shift_y + shift_z)
             elif hi_z:
-                xs_to_try.append(coord + shiftY - shiftZ)
+                xs_to_try.append(coord + shift_y - shift_z)
 
         elif hi_y:
-            xs_to_try.append(coord - shiftY)
+            xs_to_try.append(coord - shift_y)
 
             if lo_z:
-                xs_to_try.append(coord - shiftY + shiftZ)
+                xs_to_try.append(coord - shift_y + shift_z)
             elif hi_z:
-                xs_to_try.append(coord - shiftY - shiftZ)
+                xs_to_try.append(coord - shift_y - shift_z)
 
         if lo_z:
-            xs_to_try.append(coord + shiftZ)
+            xs_to_try.append(coord + shift_z)
 
         elif hi_z:
-            xs_to_try.append(coord - shiftZ)
+            xs_to_try.append(coord - shift_z)
 
     return xs_to_try
 
@@ -319,10 +284,10 @@ class PeriodicKDTree(KDTree):
         """
         self.cell_bounds = np.array(cell_bounds)
         self.cell_center = np.array(cell_center)
-        self.data = np.asarray(data)
+        self._data = np.asarray(data)
         cell_matrix = cell_matrix_from_bounds(self.cell_bounds)
         # Map all points to canonical periodic image
-        wrapped_data = wrap_into_triclinic(self.data, self.cell_center, cell_matrix)
+        wrapped_data = wrap_into_triclinic(self._data, self.cell_center, cell_matrix)
 
         # Calculate maximum distance_upper_bound
         self.max_distance_upper_bound = np.min(

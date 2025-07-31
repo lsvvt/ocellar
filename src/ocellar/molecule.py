@@ -8,7 +8,11 @@ import numpy as np
 from scipy.spatial import KDTree
 
 from ocellar import io
-from ocellar.utils.pkdtree import PeriodicKDTree, cell_matrix_from_bounds
+from ocellar.utils.pkdtree import (
+    PeriodicKDTree,
+    cell_matrix_from_bounds,
+    wrap_into_triclinic,
+)
 
 
 class Molecule:
@@ -64,10 +68,15 @@ class Molecule:
         """
         self.input_geometry = input_geometry
         self.element_types = element_types
-        self.cell_bounds = np.array(cell_bounds) if cell_bounds is not None else None
-        self.cell_center = np.array(cell_center) if cell_center is not None else None
+        if cell_bounds is not None:
+            self.cell_bounds = np.asarray(cell_bounds, dtype=float)
+            self.cell_matrix = cell_matrix_from_bounds(self.cell_bounds)
+        self.cell_center = (
+            np.asarray(cell_center, dtype=float) if cell_center is not None else None
+        )
         self.geometry = None
-        self.graph = None
+        self.graph: networkx.Graph | None = None
+        self.graph_pbc: networkx.Graph | None = None
         self.subgraphs = None
         self.unwrapped = None
 
@@ -111,6 +120,14 @@ class Molecule:
             self.geometry = driver._build_geometry(
                 self.input_geometry, self.element_types
             )
+            self.geometry = (
+                self.geometry[0],
+                wrap_into_triclinic(
+                    self.geometry[1],
+                    self.cell_center,
+                    self.cell_matrix,
+                ),
+            )
 
     def build_graph(self, backend: str = "openbabel") -> None:
         """Build the graph representation of the molecule.
@@ -125,7 +142,7 @@ class Molecule:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
 
         driver = io.Driver(backend)
-        self.graph: networkx.Graph = driver._build_bonds(self)
+        self.graph, self.graph_pbc = driver._build_bonds(self)
 
     def save_xyz(self, file_name: str, backend: str = "cclib") -> None:
         """Save the molecule geometry in XYZ format.
@@ -217,7 +234,10 @@ class Molecule:
         if self.graph is None:
             raise ValueError("Graph is not built. Call build_graph() first.")
 
-        cutted_graph = self.graph.copy()
+        this_graph = self.graph if self.cell_bounds is None else self.graph_pbc
+
+        cutted_graph = this_graph.copy()
+
         if cut_molecule:
             single_bonds = [
                 (u, v) for u, v, d in cutted_graph.edges(data=True) if d["order"] == 1
@@ -225,8 +245,8 @@ class Molecule:
             for u, v in single_bonds:
                 # if "H" not in [self.geometry[0][u], self.geometry[0][v]]:
                 if (
-                    len(list(self.graph.neighbors(u))) > 1
-                    and len(list(self.graph.neighbors(v))) > 1
+                    len(list(this_graph.neighbors(u))) > 1
+                    and len(list(this_graph.neighbors(v))) > 1
                 ):
                     cutted_graph.remove_edge(u, v)
 
@@ -303,13 +323,18 @@ class Molecule:
                 "Molecule structure is not fully built."
                 "Call build_geometry(), build_graph(), and build_structure() first."
             )
+        if self.cell_bounds is not None:
+            self.unwrap_graph_based([0, 0, 0])
+
+        this_graph = self.graph if self.cell_bounds is None else self.graph_pbc
 
         new_hydrogens = []
         for atom in selected_atoms:
-            for neighbor in self.graph.neighbors(atom):
+            for neighbor in this_graph.neighbors(atom):
                 if neighbor not in selected_atoms:
                     # Add hydrogen at standard C-H distance along bond direction
                     bond_vector = self.geometry[1][neighbor] - self.geometry[1][atom]
+                    print(np.linalg.norm(bond_vector))
                     hydrogen_position = (
                         norm(bond_vector) * 1.09 + self.geometry[1][atom]
                     )
@@ -351,6 +376,8 @@ class Molecule:
                 "Call build_geometry(), build_graph(), and build_structure() first."
             )
 
+        this_graph = self.graph if self.cell_bounds is None else self.graph_pbc
+
         # Include complete molecular fragments containing selected atoms
         selected_atoms = []
         for subgraph in self.subgraphs:
@@ -361,7 +388,7 @@ class Molecule:
         functional_group_atoms = {"O", "N", "F", "Cl", "Br", "I"}
 
         for atom in selected_atoms:
-            for neighbor in self.graph.neighbors(atom):
+            for neighbor in this_graph.neighbors(atom):
                 if (
                     self.geometry[0][neighbor] in electronegative_atoms
                     and neighbor not in selected_atoms
@@ -370,38 +397,109 @@ class Molecule:
                 if self.geometry[0][neighbor] in {"C", "N"}:
                     if any(
                         self.geometry[0][c_n_neighbor] in functional_group_atoms
-                        for c_n_neighbor in self.graph.neighbors(neighbor)
+                        for c_n_neighbor in this_graph.neighbors(neighbor)
                     ):
-                        for next_neighbor in self.graph.neighbors(neighbor):
+                        if neighbor not in selected_atoms:
+                            selected_atoms.append(neighbor)
+                        for next_neighbor in this_graph.neighbors(neighbor):
                             if next_neighbor not in selected_atoms:
                                 selected_atoms.append(next_neighbor)
 
         return selected_atoms
 
-    def unwrap(self, ref_atom: list[float]) -> None:
-        """Unwrap Molecule atomic coordinates relative to a reference atom.
+    def unwrap_graph_based(
+        self,
+        reference_coord: list[float],
+    ) -> None:
+        """Unwrap atomic coordinates by comparing periodic and non-periodic bond graphs.
 
-        PBC in all axis are assumed.
+        This method adjusts coordinates in-place so that all bonded fragments
+        are contiguous, removing jumps across periodic boundaries.
 
         Parameters
         ----------
-        ref_atom : list[float]
-            Reference atom coordinates [x_ref, y_ref, z_ref].
+        reference_coord : list[float]
+            xyz coordinates of reference atom.
 
-        Returns
-        -------
-        None
-            Unwraps coordinates in the same order as in `self.geometry` **inplace**.
+        Raises
+        ------
+        ValueError
+            If geometry or cell_bounds has not been initialized.
 
         """
-        ref_arr = np.asarray(ref_atom, dtype=float)
-        coords_arr = np.asarray(self.geometry[1], dtype=float)
-        cell_col = np.asarray(cell_matrix_from_bounds(self.cell_bounds)).T
-        cell_inv = np.linalg.inv(cell_col)
+        if self.geometry is None or self.cell_bounds is None:
+            raise ValueError(
+                "Both geometry and cell_bounds must be set before unwrapping."
+            )
 
-        delta_frac = (coords_arr - ref_arr) @ cell_inv  # fractional separation
-        shift = np.round(delta_frac)  # nearest lattice vector (-1, 0, 1)
-        coords_unwrapped = coords_arr - shift @ cell_col
+        # copy coordinates and prepare cell matrices
+        coords = self.geometry[1].copy()
+        inv_cell = np.linalg.inv(self.cell_matrix)
 
-        self.geometry = (self.geometry[0], coords_unwrapped)
+        # identify connected components in the non-PBC graph
+        components = list(networkx.connected_components(self.graph))
+        node_to_comp = {
+            node: comp_id for comp_id, comp in enumerate(components) for node in comp
+        }
+        n_comps = len(components)
+
+        # Arrays to accumulate component shifts and track which are set
+        comp_shifts = np.zeros((n_comps, 3), dtype=int)
+        shift_assigned = np.zeros(n_comps, dtype=bool)
+        dependents = [[] for _ in range(n_comps)]
+
+        def propagate_shift(root_comp: int) -> None:
+            """Cascade the shift of root_comp to all its dependents.
+
+            When a component shift is determined, all downstream dependent
+            components must inherit that shift addition.
+            """
+            stack = [root_comp]
+            while stack:
+                curr = stack.pop()
+                for dep in dependents[curr]:
+                    comp_shifts[dep] += comp_shifts[curr]
+                    stack.append(dep)
+                # Clear to avoid reprocessing
+                dependents[curr].clear()
+
+        # find edges that exist only under PBC
+        pbc_edges = set(self.graph_pbc.edges())
+        non_pbc_edges = set(self.graph.edges())
+        boundary_edges = pbc_edges - non_pbc_edges
+
+        for u, v in boundary_edges:
+            # Determine which atom is farther from reference
+            dist_u = np.linalg.norm(coords[u] - reference_coord)
+            dist_v = np.linalg.norm(coords[v] - reference_coord)
+            farther, closer = (v, u) if dist_v > dist_u else (u, v)
+
+            # Compute fractional shift between fragments
+            delta_frac = (coords[farther] - coords[closer]) @ inv_cell
+            shift_vec = np.round(delta_frac).astype(int)
+            if not shift_vec.any():
+                continue  # no periodic shift
+
+            comp_far = node_to_comp[farther]
+            comp_close = node_to_comp[closer]
+
+            if not shift_assigned[comp_far]:
+                # Base shift on closer component if it was already shifted
+                base_shift = (
+                    comp_shifts[comp_close] if shift_assigned[comp_close] else 0
+                )
+                comp_shifts[comp_far] = shift_vec + base_shift
+                shift_assigned[comp_far] = True
+                # Mark dependency and propagate
+                dependents[comp_close].append(comp_far)
+                propagate_shift(comp_far)
+
+        # apply computed shifts to coordinates
+        for comp_id, shift_vec in enumerate(comp_shifts):
+            if shift_assigned[comp_id] and shift_vec.any():
+                atom_indices = list(components[comp_id])
+                coords[atom_indices] -= shift_vec @ self.cell_matrix
+
+        # update geometry and mark as unwrapped
+        self.geometry = (self.geometry[0], coords)
         self.unwrapped = True
