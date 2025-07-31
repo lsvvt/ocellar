@@ -13,15 +13,6 @@ pdm install
 . .venv/bin/activate
 ```
 
-## Dependencies
-
-The library integrates with several computational chemistry and data analysis packages:
-- **scipy**: Scientific computing functions
-- **openbabel-wheel**: Chemical file format handling and molecular graph construction
-- **cclib**: Quantum chemistry output file parsing
-- **networkx**: Graph-based molecular structure representation
-- **MDAnalysis**: Molecular dynamics trajectory analysis
-
 ## Usage Examples
 
 ### Working with XYZ Files
@@ -107,18 +98,10 @@ new_mol.save_pdb("extracted.pdb")
 
 The library supports multiple backends for different operations:
 
-- **cclib**: Default backend for standard quantum chemistry file formats (XYZ, Gaussian, etc.)
+- **cclib**: Default backend for standard quantum chemistry file formats (XYZ)
 - **openbabel**: Chemical structure manipulation and PDB file handling
 - **MDAnalysis**: Molecular dynamics trajectory processing
 - **internal**: Custom parsers for specialized formats (CFG, LAMMPS dump)
-
-## Development Tools
-
-The project employs modern Python development practices:
-- **pdm**: Project and dependency management
-- **ruff**: Code formatting and linting
-- **wemake-python-styleguide**: Code quality enforcement
-- **pflake8**: Additional style checking
 
 ## File Format Support
 
@@ -127,7 +110,6 @@ Ocellar handles various molecular file formats commonly used in computational ch
 - PDB: Protein Data Bank format
 - CFG: MLIP configuration files
 - LAMMPS dump: Molecular dynamics simulation output
-- Various quantum chemistry output formats (via cclib)
 
 ## License
 
