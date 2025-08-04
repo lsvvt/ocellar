@@ -82,6 +82,7 @@ class Molecule:
         self.graph_pbc: networkx.Graph | None = None
         self.subgraphs = None
         self.ref_coord = [0, 0, 0]
+        self.charge = 0
         self.unwrap = False
         self.idx = None
 
@@ -370,8 +371,12 @@ class Molecule:
 
         return new_molecule, selected_atoms
 
-    def expand_selection(self, idxs: list[int]) -> list[int]:
+    def expand_selection(self, idxs: list[int]) -> set[int]:
         """Select electronegative atoms/functional group near the edge of selection.
+
+        Additionally, the function infers the total formal charge of the
+        expanded selection (quaternary ammonium, alkoxide, thiolate,
+        carboxylate) and stores it in ``self.total_charge``.
 
         Parameters
         ----------
@@ -380,7 +385,7 @@ class Molecule:
 
         Returns
         -------
-        list[int]
+        set[int]
             Indices of selected atoms.
 
         """
@@ -401,6 +406,8 @@ class Molecule:
         electronegative_atoms = {"O", "S", "N", "P"}
         functional_group_atoms = {"O", "N", "F", "Cl", "Br", "I"}
         new_selected = set()
+        processed_charge = set()
+        total_charge = 0
 
         for atom in selected_atoms:
             for neighbor in this_graph.neighbors(atom):
@@ -410,6 +417,10 @@ class Molecule:
                 # do not leave electronegative atoms on border
                 if self.geometry[0][neighbor] in electronegative_atoms:
                     new_selected.add(neighbor)
+                    # charge inferred only when we already know the atom is electronegative
+                    if neighbor not in processed_charge:
+                        total_charge += self._infer_formal_charge(neighbor, this_graph)
+                        processed_charge.add(neighbor)
                 # do not leave functional groups on border
                 if self.geometry[0][neighbor] in {"C", "N"}:
                     if any(
@@ -420,8 +431,42 @@ class Molecule:
                         new_selected.update(this_graph.neighbors(neighbor))
 
         selected_atoms.update(new_selected)
-
+        self.charge = total_charge
         return selected_atoms
+
+    def _infer_formal_charge(self, atom_id: int, graph: networkx.Graph) -> int:
+        """Infer formal charge for common functional groups.
+
+        Rules implemented
+        -----------------
+        +1 : quaternary ammonium - N with 4 neighbours
+        -1 : alkoxide - O with 1 neighbour C, C has 4 neighbours
+        -1 : thiolate - S with 1 neighbour C, C has 4 neighbours
+        -1 : carboxylate oxygen - O with 1 neighbour C,
+            C has 3 neighbours and two O neighbours
+        """
+        element = self.geometry[0][atom_id]
+        degree = graph.degree(atom_id)
+
+        # R4N+, charge +1
+        if element == "N" and degree == 4:
+            return +1
+
+        # RO- or RS-, charge -1
+        if element in {"O", "S"} and degree == 1:
+            c = next(iter(graph.neighbors(atom_id)))
+            if self.geometry[0][c] == "C":
+                c_deg = graph.degree(c)
+                if c_deg == 4:  # saturated carbon
+                    return -1
+                if c_deg == 3 and element == "O":  # unsaturated carbon
+                    o_cnt = sum(
+                        self.geometry[0][nbr] == "O" for nbr in graph.neighbors(c)
+                    )
+                    if o_cnt == 2:
+                        return -1
+
+        return 0
 
     def unwrap_graph_based(
         self,
