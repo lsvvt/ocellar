@@ -101,7 +101,7 @@ class DOpenbabel(Driver):
                 mol.cell_bounds[5],
             )
             obvec = openbabel.vector3()
-            obvec.Set(mol.cell_center[0], mol.cell_center[1], mol.cell_center[2])
+            obvec.Set(mol.cell_origin[0], mol.cell_origin[1], mol.cell_origin[2])
             obcell.SetOffset(obvec)
             obmol_new.CloneData(obcell)
 

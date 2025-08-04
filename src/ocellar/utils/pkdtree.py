@@ -72,6 +72,7 @@ def wrap_into_triclinic(
         Coordinates of the x point into the triclinic cell
 
     """
+    x = np.asarray(x)
     cell_col = np.asarray(cell_matrix)  # convert to columns
     cell_inv = np.linalg.inv(cell_col)
     frac = (x - cell_center) @ cell_inv
@@ -282,8 +283,8 @@ class PeriodicKDTree(KDTree):
             by default 10
 
         """
-        self.cell_bounds = np.array(cell_bounds)
-        self.cell_center = np.array(cell_center)
+        self.cell_bounds = np.asarray(cell_bounds)
+        self.cell_center = np.asarray(cell_center)
         self._data = np.asarray(data)
         cell_matrix = cell_matrix_from_bounds(self.cell_bounds)
         # Map all points to canonical periodic image
