@@ -68,7 +68,8 @@ class Molecule:
             Computational backend for file processing. Options include:
             - "cclib": Quantum chemistry formats - .xyz (default)
             - "openbabel" Quantum chemistry formats - .xyz
-            - "MDAnalysis": Molecular dynamics trajectories - .dump
+            - "ovito" Molecular dynamics (LAMMPS) trajectories - .dump
+            - "MDAnalysis": Molecular dynamics (LAMMPS) trajectories - .dump
             - "internal": MLIP file format - .cfg
 
         Raises
