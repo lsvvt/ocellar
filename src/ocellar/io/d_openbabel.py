@@ -63,7 +63,7 @@ class DOpenbabel(Driver):
 
         Returns
         -------
-        networkx.Graph
+        molecule_graph : networkx.Graph
             A graph representation of the molecular structure with bonds as edges.
 
         """
@@ -74,9 +74,6 @@ class DOpenbabel(Driver):
             atom.SetAtomicNum(periodictable.elements.symbol(element).number)
             x, y, z = mol.geometry[1][i]
             atom.SetVector(x, y, z)
-
-        obmol_new = openbabel.OBMol()
-        obmol_new += obmol
 
         obmol.ConnectTheDots()
         obmol.PerceiveBondOrders()
@@ -89,39 +86,7 @@ class DOpenbabel(Driver):
                 order=bond.GetBondOrder(),
             )
 
-        if mol.cell_bounds is not None:
-            obmol_new.SetPeriodicMol()
-            obcell = openbabel.OBUnitCell()
-            obcell.SetData(
-                mol.cell_bounds[0],
-                mol.cell_bounds[1],
-                mol.cell_bounds[2],
-                mol.cell_bounds[3],
-                mol.cell_bounds[4],
-                mol.cell_bounds[5],
-            )
-            obvec = openbabel.vector3()
-            obvec.Set(mol.cell_origin[0], mol.cell_origin[1], mol.cell_origin[2])
-            obcell.SetOffset(obvec)
-            obmol_new.CloneData(obcell)
-
-        obmol_new.ConnectTheDots()
-        obmol_new.PerceiveBondOrders()
-
-        molecule_graph_pbc = networkx.Graph()
-        for bond in openbabel.OBMolBondIter(obmol_new):
-            molecule_graph_pbc.add_edge(
-                bond.GetBeginAtomIdx() - 1,
-                bond.GetEndAtomIdx() - 1,
-                order=bond.GetBondOrder(),
-            )
-
-        lonely_atoms = list(set(molecule_graph_pbc.nodes) - set(molecule_graph.nodes))
-
-        for atom in lonely_atoms:
-            molecule_graph.add_node(atom)
-
-        return molecule_graph, molecule_graph_pbc
+        return molecule_graph
 
     @classmethod
     def _save_pdb(cls, file_name: str, geometry: tuple[list, numpy.ndarray]) -> None:

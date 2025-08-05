@@ -13,6 +13,7 @@ dependencies = [
     "cclib>=1.8.1",
     "networkx[default]>=3.3",
     "MDAnalysis>=2.7.0",
+    "rdkit>=2025.3.5",
 ]
 requires-python = ">=3.10"
 readme = "README.md"

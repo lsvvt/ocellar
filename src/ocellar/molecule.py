@@ -1,6 +1,5 @@
 """Main ocellar package module, containing Molecule class."""
 
-import warnings
 from pathlib import Path
 
 import networkx
@@ -8,11 +7,6 @@ import numpy as np
 from scipy.spatial import KDTree
 
 from ocellar import io
-from ocellar.utils.pkdtree import (
-    PeriodicKDTree,
-    cell_matrix_from_bounds,
-    wrap_into_triclinic,
-)
 
 
 class Molecule:
@@ -26,10 +20,6 @@ class Molecule:
         Element symbols corresponding to atom types in certain file formats
         (CFG, LAMMPS dump). Required when atoms are specified by numeric
         type identifiers rather than element symbols.
-    cell_origin : np.typing.ArrayLike or None
-        List of cell origin coordinates in format `[x_0, y_0, z_0]`.
-    cell_bounds : np.typing.ArrayLike or None
-        List of cell parameters in format `[L_x, L_y, L_z, alpha, beta, gamma]`.
     geometry : tuple[list, np.ndarray] or None
         A tuple containing:
         - list: A list of element symbols.
@@ -38,8 +28,6 @@ class Molecule:
         Graph representation of the molecular structure.
     subgraphs : list or None
         list of connected components in the molecular graph.
-    unwrapped: bool
-        True if Molecule was unwrapped by :py:meth:`Molecule.unwrap` method
 
     """
 
@@ -47,8 +35,6 @@ class Molecule:
         self,
         input_geometry: str | Path | None = None,
         element_types: np.typing.ArrayLike | None = None,
-        cell_origin: np.typing.ArrayLike | None = None,
-        cell_bounds: np.typing.ArrayLike | None = None,
     ) -> None:
         """Initialize the Molecule object.
 
@@ -60,31 +46,14 @@ class Molecule:
             Element symbols corresponding to atom types in certain file formats
             (CFG, LAMMPS dump). Required when atoms are specified by numeric
             type identifiers rather than element symbols.
-        cell_origin : np.typing.ArrayLike or None
-            List of cell origin coordinates in format `[x_0, y_0, z_0]`.
-        cell_bounds : np.typing.ArrayLike or None
-            List of cell parameters in format `[L_x, L_y, L_z, alpha, beta, gamma]`.
 
         """
         self.input_geometry = input_geometry
         self.element_types = element_types
-        if cell_bounds is not None:
-            self.cell_bounds = np.asarray(cell_bounds, dtype=float)
-            self.cell_matrix = cell_matrix_from_bounds(self.cell_bounds)
-        else:
-            self.cell_bounds = None
-            self.cell_matrix = None
-        self.cell_origin = (
-            np.asarray(cell_origin, dtype=float) if cell_origin is not None else None
-        )
         self.geometry = None
         self.graph: networkx.Graph | None = None
-        self.graph_pbc: networkx.Graph | None = None
         self.subgraphs = None
-        self.ref_coord = [0, 0, 0]
         self.charge = 0
-        self.unwrap = False
-        self.idx = None
 
     def build_geometry(self, backend: str = "cclib") -> None:
         """Build molecular geometry from input file.
@@ -98,15 +67,16 @@ class Molecule:
         backend : str, optional
             Computational backend for file processing. Options include:
             - "cclib": Quantum chemistry formats - .xyz (default)
+            - "openbabel" Quantum chemistry formats - .xyz
             - "MDAnalysis": Molecular dynamics trajectories - .dump
-            - "internal": Custom MLIP .cfg and LAMMPS .dump parsers
+            - "internal": MLIP file format - .cfg
 
         Raises
         ------
         ValueError
             If `input_geometry` is not defined or
             if `element_types` is required but not provided
-            for the selected backend or if `bounds` is required but not provided.
+            for the selected backend.
 
         """
         if self.input_geometry is None:
@@ -118,25 +88,9 @@ class Molecule:
         else:
             if self.element_types is None:
                 raise ValueError("element_types is not defined")
-            if self.cell_bounds is None:
-                warnings.warn(
-                    "Cell bounds are not defined, extracting will be non-periodic",
-                    stacklevel=2,
-                )
             self.geometry = driver._build_geometry(
                 self.input_geometry, self.element_types
             )
-            if backend == "MDAnalysis":
-                self.geometry = (self.geometry[0], self.geometry[1] + self.cell_origin)
-            if self.cell_bounds is not None:
-                self.geometry = (
-                    self.geometry[0],
-                    wrap_into_triclinic(
-                        self.geometry[1],
-                        self.cell_origin,
-                        self.cell_matrix,
-                    ),
-                )
 
     def build_graph(self, backend: str = "openbabel") -> None:
         """Build the graph representation of the molecule.
@@ -151,7 +105,7 @@ class Molecule:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
 
         driver = io.Driver(backend)
-        self.graph, self.graph_pbc = driver._build_bonds(self)
+        self.graph = driver._build_bonds(self)
 
     def save_xyz(self, file_name: str, backend: str = "cclib") -> None:
         """Save the molecule geometry in XYZ format.
@@ -243,9 +197,7 @@ class Molecule:
         if self.graph is None:
             raise ValueError("Graph is not built. Call build_graph() first.")
 
-        this_graph = self.graph if self.cell_bounds is None else self.graph_pbc
-
-        cutted_graph = this_graph.copy()
+        cutted_graph = self.graph.copy()
 
         if cut_molecule:
             single_bonds = [
@@ -253,7 +205,7 @@ class Molecule:
             ]
             for u, v in single_bonds:
                 # if "H" not in [self.geometry[0][u], self.geometry[0][v]]:
-                if this_graph.degree[u] > 1 and this_graph.degree[v] > 1:
+                if self.graph.degree[u] > 1 and self.graph.degree[v] > 1:
                     cutted_graph.remove_edge(u, v)
 
         self.subgraphs = [c for c in networkx.connected_components(cutted_graph)]
@@ -271,46 +223,31 @@ class Molecule:
         Returns
         -------
         idx : list[int]
-            Indices of atoms within the specified radius,
-            with respect to PBC if cell_bounds is defined.
+            Indices of atoms within the specified radius.
 
         """
         if self.geometry is None:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
-        center = np.array(center)
+        center = np.asarray(center, dtype=float)
         tree = KDTree(data=self.geometry[1])
         idx = tree.query_ball_point(center, r, workers=-1)
-        if self.cell_bounds is not None:
-            ptree = PeriodicKDTree(
-                cell_bounds=self.cell_bounds,
-                cell_center=self.cell_origin,
-                data=self.geometry[1],
-            )
-            idx_pbc = ptree.query_ball_point(center, r, workers=-1)
-            self.idx_pbc = idx_pbc.copy()
-        self.r = r
-        self.idx = idx.copy()
-        self.idx_pbc = idx_pbc.copy()
-        if self.cell_bounds is not None:
-            return idx_pbc
-        else:
-            return idx
+        return idx
 
-    def select(self, selected_atoms: list[int]) -> tuple["Molecule", list[int]]:
+    def select(self, selected_atoms: set[int]) -> tuple["Molecule", list[int]]:
         """Select a subset of the molecule based on atom indices.
 
         Parameters
         ----------
-        selected_atoms : list[int]
-            list of selected atom indices.
+        selected_atoms : set[int]
+            set of selected atom indices.
 
         Returns
         -------
         tuple: [Molecule, list[int]]
             A tuple containing:
             - Molecule: A new Molecule object containing the selected atoms
-            and necessary hydrogens.
-            - list[int]: An array of selected atoms index.
+            and necessary hydrogens with inferred charge.
+            - list[int]: A sorted array of selected atoms index.
 
         """
 
@@ -335,15 +272,10 @@ class Molecule:
                 "Molecule structure is not fully built."
                 "Call build_geometry(), build_graph(), and build_structure() first."
             )
-        if (self.cell_bounds is not None) and self.unwrap:
-            self.unwrap_graph_based_new()
-            self._translate_components_closer_to_ref(self.ref_coord, self.r)
-
-        this_graph = self.graph if self.cell_bounds is None else self.graph_pbc
 
         new_hydrogens = []
         for atom in selected_atoms:
-            for neighbor in this_graph.neighbors(atom):
+            for neighbor in self.graph.neighbors(atom):
                 if neighbor not in selected_atoms:
                     # Add hydrogen at standard C-H distance along bond direction
                     bond_vector = self.geometry[1][neighbor] - self.geometry[1][atom]
@@ -354,9 +286,9 @@ class Molecule:
 
         selected_atoms = sorted(list(selected_atoms))
 
-        new_molecule = Molecule(
-            cell_origin=self.cell_origin, cell_bounds=self.cell_bounds
-        )
+        new_molecule = Molecule()
+        new_molecule.charge = self.charge  # assign charge to new_mol
+        self.charge = 0  # restore charge for further usage
 
         new_molecule.geometry = (
             [self.geometry[0][i] for i in selected_atoms],
@@ -376,7 +308,7 @@ class Molecule:
 
         Additionally, the function infers the total formal charge of the
         expanded selection (quaternary ammonium, alkoxide, thiolate,
-        carboxylate) and stores it in ``self.total_charge``.
+        carboxylate) and stores it in `self.charge`.
 
         Parameters
         ----------
@@ -385,7 +317,7 @@ class Molecule:
 
         Returns
         -------
-        set[int]
+        selected_atoms : set[int]
             Indices of selected atoms.
 
         """
@@ -394,8 +326,6 @@ class Molecule:
                 "Molecule structure is not fully built."
                 "Call build_geometry(), build_graph(), and build_structure() first."
             )
-
-        this_graph = self.graph if self.cell_bounds is None else self.graph_pbc
 
         # Include complete molecular fragments containing selected atoms
         selected_atoms = set()
@@ -406,47 +336,62 @@ class Molecule:
         electronegative_atoms = {"O", "S", "N", "P"}
         functional_group_atoms = {"O", "N", "F", "Cl", "Br", "I"}
         new_selected = set()
-        processed_charge = set()
+        self._processed_atoms = set()
         total_charge = 0
 
         for atom in selected_atoms:
-            for neighbor in this_graph.neighbors(atom):
+            for neighbor in self.graph.neighbors(atom):
                 # do not replace CX2 fragment with two H's
-                if this_graph.degree[neighbor] >= 2:
+                if self.graph.degree[neighbor] >= 2:
                     new_selected.add(neighbor)
                 # do not leave electronegative atoms on border
                 if self.geometry[0][neighbor] in electronegative_atoms:
                     new_selected.add(neighbor)
-                    # charge inferred only when we already know the atom is electronegative
-                    if neighbor not in processed_charge:
-                        total_charge += self._infer_formal_charge(neighbor, this_graph)
-                        processed_charge.add(neighbor)
                 # do not leave functional groups on border
                 if self.geometry[0][neighbor] in {"C", "N"}:
                     if any(
                         self.geometry[0][c_n_neighbor] in functional_group_atoms
-                        for c_n_neighbor in this_graph.neighbors(neighbor)
+                        for c_n_neighbor in self.graph.neighbors(neighbor)
                     ):
                         new_selected.add(neighbor)
-                        new_selected.update(this_graph.neighbors(neighbor))
+                        new_selected.update(self.graph.neighbors(neighbor))
 
         selected_atoms.update(new_selected)
+
+        # infer charges for final selection
+        for atom in selected_atoms:
+            if (self.geometry[0][atom] in electronegative_atoms) and (
+                atom not in self._processed_atoms
+            ):
+                total_charge += self._infer_formal_charge(atom)
+
         self.charge = total_charge
         return selected_atoms
 
-    def _infer_formal_charge(self, atom_id: int, graph: networkx.Graph) -> int:
+    def _infer_formal_charge(self, atom_id: int) -> int:
         """Infer formal charge for common functional groups.
 
-        Rules implemented
-        -----------------
+        Parameters
+        ----------
+        atom_id : int
+            Index of electronegative atom carrying possible charge.
+
+        Returns
+        -------
+        int
+            Formal charge of atom with `atom_id`
+
+        Notes
+        -----
         +1 : quaternary ammonium - N with 4 neighbours
-        -1 : alkoxide - O with 1 neighbour C, C has 4 neighbours
-        -1 : thiolate - S with 1 neighbour C, C has 4 neighbours
+        -1 : alkoxide - O with 1 neighbour C and C has 4 neighbours
+        -1 : thiolate - S with 1 neighbour C and C has 4 neighbours
         -1 : carboxylate oxygen - O with 1 neighbour C,
             C has 3 neighbours and two O neighbours
+
         """
         element = self.geometry[0][atom_id]
-        degree = graph.degree(atom_id)
+        degree = self.graph.degree(atom_id)
 
         # R4N+, charge +1
         if element == "N" and degree == 4:
@@ -454,274 +399,16 @@ class Molecule:
 
         # RO- or RS-, charge -1
         if element in {"O", "S"} and degree == 1:
-            c = next(iter(graph.neighbors(atom_id)))
+            c = next(iter(self.graph.neighbors(atom_id)))
             if self.geometry[0][c] == "C":
-                c_deg = graph.degree(c)
+                c_deg = self.graph.degree(c)
                 if c_deg == 4:  # saturated carbon
                     return -1
                 if c_deg == 3 and element == "O":  # unsaturated carbon
                     o_cnt = sum(
-                        self.geometry[0][nbr] == "O" for nbr in graph.neighbors(c)
+                        self.geometry[0][nbr] == "O" for nbr in self.graph.neighbors(c)
                     )
                     if o_cnt == 2:
+                        self._processed_atoms.update(self.graph.neighbors(c))
                         return -1
-
         return 0
-
-    def unwrap_graph_based(
-        self,
-    ) -> None:
-        """Unwrap atomic coordinates by comparing periodic and non-periodic bond graphs.
-
-        This method adjusts coordinates in-place so that all bonded fragments
-        are contiguous, removing jumps across periodic boundaries.
-
-        Raises
-        ------
-        ValueError
-            If geometry or cell_bounds has not been initialized.
-
-        """
-
-        def propagate_shift(comp_close: int, comp_far: int) -> None:
-            """Cascade the shift of root_comp to all its dependents.
-
-            When a component shift is determined, all downstream dependent
-            components must inherit that shift addition.
-            """
-            stack = [comp_far]
-            while stack:
-                curr = stack.pop()
-                for dep in dependents[curr]:
-                    dependents[comp_close].append(dep)
-                    stack.append(dep)
-            for dep in dependents[comp_close]:
-                comp_shifts[dep] += comp_shifts[comp_close]
-
-        def find_atom_idx(atom_coord: list[float]) -> int:
-            """Find atomic index in self.geometry using np.isclose.
-
-            It is needed to find a reference connected component.
-
-            Parameters
-            ----------
-            atom_coord : list[float]
-                Coordinates of reference atom.
-
-            Returns
-            -------
-            int
-                Index of atom belonging to self.geometry with given atomic coordinates.
-
-            """
-            for idx, coords in enumerate(self.geometry[1]):
-                if np.isclose(coords, atom_coord, atol=0.01).all():
-                    return idx
-
-        if self.geometry is None or self.cell_bounds is None:
-            raise ValueError(
-                "Both geometry and cell_bounds must be set before unwrapping."
-            )
-
-        # copy coordinates and prepare cell matrices
-        coords = self.geometry[1].copy()
-        inv_cell = np.linalg.inv(self.cell_matrix)
-
-        # identify connected components in the non-PBC graph
-        components = list(networkx.connected_components(self.graph))
-        node_to_comp = {
-            node: comp_id for comp_id, comp in enumerate(components) for node in comp
-        }
-        n_comps = len(components)
-
-        # Arrays to accumulate component shifts and track which are set
-        comp_shifts = np.zeros((n_comps, 3), dtype=int)
-        shift_assigned = np.zeros(n_comps, dtype=bool)
-        dependents = [[] for _ in range(n_comps)]
-
-        # find edges that exist only under PBC
-        pbc_edges = set(self.graph_pbc.edges())
-        non_pbc_edges = set(self.graph.edges())
-        boundary_edges = pbc_edges - non_pbc_edges
-
-        ref_comp_idx = node_to_comp[find_atom_idx(self.ref_coord)]
-
-        for u, v in boundary_edges:
-            # Determine which atom is farther from reference
-            dist_u = np.linalg.norm(coords[u] - self.ref_coord)
-            dist_v = np.linalg.norm(coords[v] - self.ref_coord)
-            farther, closer = (v, u) if dist_v > dist_u else (u, v)
-
-            """if node_to_comp[farther] == ref_comp_idx:
-                farther, closer = closer, farther"""
-
-            # Compute fractional shift between fragments
-            delta_frac = (coords[farther] - coords[closer]) @ inv_cell
-            shift_vec = np.round(delta_frac).astype(int)
-
-            # if not shift_vec.any():
-            #    continue  # no periodic shift
-
-            comp_far = node_to_comp[farther]
-            comp_close = node_to_comp[closer]
-
-            if not shift_assigned[comp_far]:
-                # Base shift on closer component if it was already shifted
-                base_shift = (
-                    comp_shifts[comp_close] if shift_assigned[comp_close] else 0
-                )
-                comp_shifts[comp_far] = shift_vec + base_shift
-                shift_assigned[comp_far] = True
-                # Mark dependency and propagate
-                dependents[comp_close].append(comp_far)
-                propagate_shift(comp_close, comp_far)
-
-        ref_comp_idx = node_to_comp[find_atom_idx(self.ref_coord)]
-
-        if comp_shifts[ref_comp_idx].any():
-            for comp_id in range(n_comps):
-                if (comp_id == ref_comp_idx) or comp_id in dependents[ref_comp_idx]:
-                    continue
-                else:
-                    comp_shifts[comp_id] += comp_shifts[ref_comp_idx]
-
-        # apply computed shifts to coordinates
-        for comp_id, shift_vec in enumerate(comp_shifts):
-            if shift_assigned[comp_id] and shift_vec.any():
-                atom_indices = list(components[comp_id])
-                coords[atom_indices] -= shift_vec @ self.cell_matrix
-
-        # update geometry
-        self.geometry = (self.geometry[0], coords)
-
-    def unwrap_graph_based_new(self) -> None:
-        """Unwrap atomic coordinates by comparing bond graphs."""
-
-        def find_atom_idx(atom_coord: list[float]) -> int:
-            for idx, coords in enumerate(self.geometry[1]):
-                if np.isclose(coords, atom_coord, atol=0.01).all():
-                    return idx
-            raise ValueError("Reference atom not found in geometry")
-
-        if self.geometry is None or self.cell_bounds is None:
-            raise ValueError(
-                "Both geometry and cell_bounds must be set before unwrapping."
-            )
-
-        old_coords = self.geometry[1].copy()
-        coords = self.geometry[1].copy()
-        inv_cell = np.linalg.inv(self.cell_matrix)
-
-        # mutable component sets so we can union them
-        components = [set(c) for c in networkx.connected_components(self.graph)]
-        node_to_comp = {n: i for i, comp in enumerate(components) for n in comp}
-
-        comp_shifts = [np.zeros(3, dtype=int) for _ in components]
-        shift_assigned = [False] * len(components)
-
-        pbc_edges = set(self.graph_pbc.edges())
-        boundary_edges = pbc_edges - set(self.graph.edges())
-
-        ref_coord = self.ref_coord
-        ref_idx = find_atom_idx(ref_coord)
-
-        # single sweep over boundary bonds
-        for u, v in boundary_edges:
-            cu, cv = node_to_comp[u], node_to_comp[v]
-            if cu == cv:  # already in same component
-                continue
-            # decide which atom is farther from the reference point
-            dist_u = np.linalg.norm(
-                coords[list(components[node_to_comp[u]])].mean() - ref_coord
-            )
-            dist_v = np.linalg.norm(
-                coords[list(components[node_to_comp[v]])].mean() - ref_coord
-            )
-            farther, closer = (v, u) if dist_v > dist_u else (u, v)
-
-            comp_far, comp_close = node_to_comp[farther], node_to_comp[closer]
-
-            # fractional shift needed to superimpose the two atoms through PBC
-            delta_frac = (coords[farther] - coords[closer]) @ inv_cell
-            shift_vec = np.round(delta_frac).astype(int)
-
-            # cumulative shift for the far component
-            parent_shift = comp_shifts[comp_close] if shift_assigned[comp_close] else 0
-            comp_shifts[comp_far] = shift_vec + parent_shift
-            shift_assigned[comp_far] = True
-
-            # apply the shift immediately to every atom in comp_far
-            cart_shift = comp_shifts[comp_far] @ self.cell_matrix
-            for idx in components[comp_far]:
-                coords[idx] -= cart_shift
-
-            # merge the two components
-            components[comp_close].update(components[comp_far])
-            for n in components[comp_far]:
-                node_to_comp[n] = comp_close
-            components[comp_far].clear()  # mark as merged, skipped later
-
-        # final pass only over surviving component ids
-        for comp_id, atom_set in enumerate(components):
-            if not atom_set:  # merged components are empty
-                continue
-            if shift_assigned[comp_id]:
-                coords[list(atom_set)] -= comp_shifts[comp_id] @ self.cell_matrix
-
-        ref_comp_idx = node_to_comp[ref_idx]
-        ref_shift_cart = ref_coord - coords[ref_idx]
-        if ref_shift_cart.any():
-            coords[list(components[ref_comp_idx])] += ref_shift_cart
-
-        for comp_id, atom_set in enumerate(components):
-            if (comp_id == ref_comp_idx) or not atom_set:
-                continue
-            for i in atom_set:
-                if i in self.idx:
-                    old_dist = np.linalg.norm(ref_coord - old_coords[i])
-                    new_dist = np.linalg.norm(coords[ref_idx] - coords[i])
-                    if new_dist > old_dist:
-                        coords[list(atom_set)] += old_coords[i] - coords[i]
-
-        self.geometry = (self.geometry[0], coords)
-
-    def _translate_components_closer_to_ref(
-        self, ref_point: np.ndarray, r: float
-    ) -> None:
-        """After unwrapping, make sure every atom that appears in a PBC sphere of
-        radius *r* around *ref_point* is actually the *closest* image:
-            1. build a non-periodic and a periodic KDTree
-            2. find atoms that occur only in the periodic query
-            3. for each such atom translate its whole bonded component by the
-               integral lattice vector that minimises its distance to *ref_point*
-        The coordinates of `self.geometry[1]` are **modified in-place**.
-        """
-
-        surplus_atoms = set(self.idx_pbc) - set(self.idx)
-        if not surplus_atoms:
-            return  # nothing to do
-
-        # ---------- component bookkeeping ------------------------------------
-        components = list(networkx.connected_components(self.graph_pbc))
-        node_to_comp = {n: i for i, comp in enumerate(components) for n in comp}
-        shifted_components: set[int] = set()
-
-        inv_cell = np.linalg.inv(self.cell_matrix)
-
-        # ---------- translate whole components -------------------------------
-        for atom in surplus_atoms:
-            comp_id = node_to_comp[atom]
-            if comp_id in shifted_components:
-                continue  # already shifted once
-
-            # lattice vector that brings *atom* closest to ref_point
-            frac_disp = (self.geometry[1][atom] - ref_point) @ inv_cell
-            shift_vec = np.round(frac_disp).astype(int)  # integral shift
-            if not shift_vec.any():
-                continue  # already closest
-
-            cart_shift = -shift_vec @ self.cell_matrix  # minus = bring closer
-            for idx in components[comp_id]:
-                self.geometry[1][idx] += cart_shift  # in-place
-
-            shifted_components.add(comp_id)
