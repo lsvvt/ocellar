@@ -5,7 +5,7 @@ import numpy
 from ocellar.io.driver import Driver
 
 
-class Dinternal(Driver):
+class DInternal(Driver):
     """Class for a io driver.
 
     Attributes
