@@ -28,6 +28,11 @@ class Molecule:
         Graph representation of the molecular structure.
     subgraphs : list or None
         list of connected components in the molecular graph.
+    cell : np.ndarray or None
+        Cell parameters of shape [3, 4] in ovito format, set externally.
+    charge : int
+        Charge of this molecule object, possibly inferred by
+        meth::Molecule:_infer_fromal_charge
 
     """
 
@@ -53,6 +58,7 @@ class Molecule:
         self.geometry = None
         self.graph: networkx.Graph | None = None
         self.subgraphs = None
+        self.cell = None
         self.charge = 0
 
     def build_geometry(self, backend: str = "cclib") -> None:
@@ -92,6 +98,52 @@ class Molecule:
             self.geometry = driver._build_geometry(
                 self.input_geometry, self.element_types
             )
+
+    def replicate_geometry(self) -> None:
+        """Replicate current geometry into a 3x3x3 supercell.
+
+        The replication order follows ovito's logic,
+        iterating a, b, c vectors from negative to positive.
+
+        This function is necessary to correctly work with periodic boundary conditions.
+
+        Raises
+        ------
+        ValueError
+            If `self.geometry` is not set.
+            If `self.cell` is not set.
+
+        Returns
+        -------
+        None
+            Replicates `self.geometry` inplace.
+
+        Notes
+        -----
+        `self.cell` must be a NumPy array where each column is a lattice vector:
+        `a = self.cell[:, 0]`, `b = self.cell[:, 1]`, `c = self.cell[:, 2]`.
+
+        """
+        if self.geometry is None:
+            raise ValueError("Geometry is not built. Call build_geometry() first.")
+        if self.cell is None:
+            raise ValueError("Cell is not set. Set self.cell before replication.")
+
+        elements, coords = self.geometry
+        a = np.asarray(self.cell[:, 0], dtype=float)
+        b = np.asarray(self.cell[:, 1], dtype=float)
+        c = np.asarray(self.cell[:, 2], dtype=float)
+
+        shifts = []
+        for ai in (-1, 0, 1):
+            for bi in (-1, 0, 1):
+                for ci in (-1, 0, 1):
+                    shifts.append(ai * a + bi * b + ci * c)
+
+        replicated_coords = np.concatenate([coords + s for s in shifts], axis=0)
+        replicated_elements = elements * 27
+
+        self.geometry = (replicated_elements, replicated_coords)
 
     def build_graph(self, backend: str = "openbabel") -> None:
         """Build the graph representation of the molecule.
