@@ -176,4 +176,4 @@ class DInternal(Driver):
 
         with open(file_name, "w") as f_out:
             for idx, (x, y, z) in zip(idxs, coordinates, strict=True):
-                f_out.write(f"{idx} {x} {y} {z}\n")
+                f_out.write(f"{idx} {x:.10f} {y:.10f} {z:.10f}\n")

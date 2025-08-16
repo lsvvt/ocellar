@@ -1,6 +1,5 @@
 """Module to handle molecule operations using MDAnalysis."""
 
-import MDAnalysis
 import numpy as np
 
 from ocellar.io.driver import Driver
@@ -39,6 +38,8 @@ class DMDAnalysis(Driver):
             - numpy.ndarray: An array of atomic coordinates.
 
         """
+        import MDAnalysis
+
         u = MDAnalysis.Universe(input_geometry, format="LAMMPSDUMP")
 
         coordinates = u.atoms.positions.astype(float)
