@@ -236,6 +236,30 @@ class Molecule:
         driver = io.Driver(backend)
         driver._save_cfg(file_name, input_geometry, idxs)
 
+    def save_mlipff(
+        self,
+        file_name: str,
+        idxs: list[int],
+        backend: str = "internal",
+    ) -> None:
+        """Save the molecule geometry in mlipff format.
+
+        Parameters
+        ----------
+        file_name : str
+            The name of the file to save the mlipff data.
+        input_geometry : str or None
+            Path to the input geometry file.
+        idxs : list[int]
+            Indices of atoms.
+        backend : str, optional
+            The backend to use for saving mlipff (default is "internal").
+
+        """
+        driver = io.Driver(backend)
+        coordinates = self.geometry[1][idxs]
+        driver._save_mlipff(file_name, coordinates, idxs)
+
     def build_structure(self, *, cut_molecule: bool) -> None:
         """Build the substructure of the molecule by identifying connected components.
 
