@@ -15,8 +15,9 @@ dependencies = [
     "MDAnalysis>=2.7.0",
     "rdkit>=2025.3.5",
     "ovito>=3.13.0",
+    "pytest>=8.4.1",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 readme = "README.md"
 license = {text = "MIT"}
 
@@ -48,8 +49,3 @@ docstring-code-line-length = "dynamic"
 max-line-length = 88
 extend-ignore = ["WPS306", "WPS305", "DAR101", "DAR201"]
 inline-quotes = "double"
-
-[dependency-groups]
-dev = [
-    "pytest>=8.4.1",
-]
