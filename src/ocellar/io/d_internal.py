@@ -42,33 +42,33 @@ class DInternal(Driver):
         coordinates = []
 
         with open(input_geometry) as f:
-            lines = f.readlines()
-
-        for line in lines:
-            if "Size" in line:
-                n_atoms = int(next(lines).strip())
-            elif "AtomData" in line:
-                header = line.split(":", 1)[1].split()
-                type_idx, x_idx, y_idx, z_idx = (
-                    header.index(label)
-                    for label in ("type", "cartes_x", "cartes_y", "cartes_z")
-                )
-                if n_atoms is None:
-                    raise ValueError("Number of atoms record not found before header")
-                for _ in range(n_atoms):
-                    parts = next(lines).split()
-                    atom_type = int(parts[type_idx])
-                    elements.append(element_types[atom_type])
-                    coordinates.append(
-                        [
-                            float(parts[x_idx]),
-                            float(parts[y_idx]),
-                            float(parts[z_idx]),
-                        ]
+            for line in f:
+                if "Size" in line:
+                    n_atoms = int(next(f).strip())
+                elif "AtomData" in line:
+                    header = line.split(":", 1)[1].split()
+                    type_idx, x_idx, y_idx, z_idx = (
+                        header.index(label)
+                        for label in ("type", "cartes_x", "cartes_y", "cartes_z")
                     )
-                break
+                    if n_atoms is None:
+                        raise ValueError(
+                            "Number of atoms record not found before header"
+                        )
+                    for _ in range(n_atoms):
+                        parts = next(f).split()
+                        atom_type = int(parts[type_idx])
+                        elements.append(element_types[atom_type])
+                        coordinates.append(
+                            [
+                                float(parts[x_idx]),
+                                float(parts[y_idx]),
+                                float(parts[z_idx]),
+                            ]
+                        )
+                    break
 
-        return elements, np.array(coordinates)
+        return elements, np.asarray(coordinates, dtype=float)
 
     @classmethod
     def _save_cfg(cls, file_name: str, input_geometry: str, idxs: list[int]) -> None:
