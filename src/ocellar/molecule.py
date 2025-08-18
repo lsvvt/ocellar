@@ -361,6 +361,8 @@ class Molecule:
     def select_after_expand(self, idxs: set[int]) -> tuple["Molecule", list[int]]:
         """Build passivated copy from `selected_atoms* after expanding selection.
 
+        Must be used after :py:meth:`ocellar.molecule.Molecule.expand_selection`.
+
         Keeps inferred formal charge.
 
         Parameters
@@ -464,7 +466,7 @@ class Molecule:
             Atom indices that must appear in the returned molecule.
         copy_charge : bool, optional
             If `True` the formal charge stored in `self.charge` is
-            transferred to the new molecule and reset to zero on *self*.
+            transferred to the new molecule and reset to zero on `self`.
 
         Returns
         -------

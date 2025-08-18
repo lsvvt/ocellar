@@ -54,7 +54,9 @@ center = [1.0922, 0.89253, 1.03008]
 radius = 2
 
 # Extract molecular fragment
-new_mol, atom_indices = mol.select(mol.expand_selection(mol.select_r(center, radius)))
+new_mol, atom_indices = mol.select(mol.select_r(center, radius))
+# Or extract molecular fragment with respect to functional groups and infer charge
+new_mol, atom_indices = mol.select_after_expand(mol.expand_selection(mol.select_r(center, radius)))
 
 # Save extracted fragment
 mol.save_dump("fragment.dump", mol.input_geometry, atom_indices)
@@ -78,7 +80,9 @@ mol.build_structure(cut_molecule=True) # passivate loose ends with hydrogens
 center = [44.1066, 57.6431, 52.0]
 radius = 5.0
 # Extract molecular fragment
-new_mol, atom_indices = mol.select(mol.expand_selection(mol.select_r(center, radius)))
+new_mol, atom_indices = mol.select(mol.select_r(center, radius))
+# Or extract molecular fragment with respect to functional groups and infer charge
+new_mol, atom_indices = mol.select_after_expand(mol.expand_selection(mol.select_r(center, radius)))
 
 # Export results
 mol.save_cfg("output.cfg", mol.input_geometry, atom_indices)
@@ -103,7 +107,9 @@ mol.build_structure(cut_molecule=False)
 center = [44.1066, 57.6431, 52.0]
 radius = 5.0
 # Extract molecular fragment
-new_mol, atom_indices = mol.select(mol.expand_selection(mol.select_r(center, radius)))
+new_mol, atom_indices = mol.select(mol.select_r(center, radius))
+# Or extract molecular fragment with respect to functional groups and infer charge
+new_mol, atom_indices = mol.select_after_expand(mol.expand_selection(mol.select_r(center, radius)))
 
 # Export results
 mol.save_cfg("output.cfg", mol.input_geometry, atom_indices)
