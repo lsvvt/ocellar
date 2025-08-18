@@ -9,6 +9,23 @@ from scipy.spatial import KDTree
 from ocellar import io
 
 
+def norm(xyz: np.typing.ArrayLike) -> np.ndarray:
+    """Normalize a vector.
+
+    Parameters
+    ----------
+    xyz : np.typing.ArrayLike
+        Vector coordinates
+
+    Returns
+    -------
+    np.ndarray
+        Normalized coordinates of given vector
+
+    """
+    return np.array(xyz) / np.linalg.norm(xyz)
+
+
 class Molecule:
     """A class to represent a molecule and its properties.
 
@@ -327,23 +344,6 @@ class Molecule:
             - list[int]: A sorted array of selected atoms index.
 
         """
-
-        def norm(xyz: np.typing.ArrayLike) -> np.ndarray:
-            """Normalize a vector.
-
-            Parameters
-            ----------
-            xyz : np.typing.ArrayLike
-                Vector coordinates
-
-            Returns
-            -------
-            np.ndarray
-                Normalized coordinates of given vector
-
-            """
-            return np.array(xyz) / np.linalg.norm(xyz)
-
         if self.geometry is None or self.graph is None or self.subgraphs is None:
             raise ValueError(
                 "Molecule structure is not fully built."
