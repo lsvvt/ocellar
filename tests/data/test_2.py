@@ -6,7 +6,7 @@ mol.build_geometry(backend="internal")
 
 mol.build_graph()
 mol.build_structure(cut_molecule=False)
-new_mol, idxs = mol.select(mol.select_r([44.1066, 57.6431, 52.0], 10))
+new_mol, idxs = mol.select_after_expand(mol.select_r([44.1066, 57.6431, 52.0], 10))
 
 mol.save_cfg(
     "out.cfg", mol.input_geometry, idxs

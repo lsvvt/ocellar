@@ -1,11 +1,18 @@
 """Module to handle molecule operations using Open Babel."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import networkx
 import numpy
 import periodictable
-from openbabel import openbabel, pybel  # type: ignore
+from openbabel import openbabel, pybel
 
 from ocellar.io.driver import Driver
+
+if TYPE_CHECKING:
+    from ocellar.molecule import Molecule
 
 
 class DOpenbabel(Driver):
@@ -43,28 +50,29 @@ class DOpenbabel(Driver):
         return elements, coordinates
 
     @classmethod
-    def _build_bonds(cls, geometry: tuple[list, numpy.ndarray]) -> networkx.Graph:
+    def _build_bonds(
+        cls,
+        mol: Molecule,
+    ) -> networkx.Graph:
         """Build a graph representation of molecular bonds using openbabel.
 
         Parameters
         ----------
-        geometry : tuple
-            A tuple containing:
-            - list: A list of element symbols.
-            - numpy.ndarray: An array of atomic coordinates.
+        mol : ocellar.Molecule
+            An object of class Molecule with built geometry.
 
         Returns
         -------
-        networkx.Graph
+        molecule_graph : networkx.Graph
             A graph representation of the molecular structure with bonds as edges.
 
         """
         obmol = openbabel.OBMol()
 
-        for i, element in enumerate(geometry[0]):
+        for i, element in enumerate(mol.geometry[0]):
             atom = obmol.NewAtom()
             atom.SetAtomicNum(periodictable.elements.symbol(element).number)
-            x, y, z = geometry[1][i]
+            x, y, z = mol.geometry[1][i]
             atom.SetVector(x, y, z)
 
         obmol.ConnectTheDots()

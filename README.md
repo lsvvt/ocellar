@@ -13,18 +13,9 @@ pdm install
 . .venv/bin/activate
 ```
 
-## Dependencies
-
-The library integrates with several computational chemistry and data analysis packages:
-- **scipy**: Scientific computing functions
-- **openbabel-wheel**: Chemical file format handling and molecular graph construction
-- **cclib**: Quantum chemistry output file parsing
-- **networkx**: Graph-based molecular structure representation
-- **MDAnalysis**: Molecular dynamics trajectory analysis
-
 ## Usage Examples
 
-### Working with XYZ Files
+### Working with .xyz Files
 
 Load molecular geometry from standard XYZ format files and perform basic operations:
 
@@ -32,8 +23,7 @@ Load molecular geometry from standard XYZ format files and perform basic operati
 from ocellar import molecule
 
 # Initialize molecule and load geometry
-mol = molecule.Molecule()
-mol.input_geometry = "tests/data/traj.xyz"
+mol = molecule.Molecule("tests/data/traj.xyz")
 mol.build_geometry()
 
 # Save processed geometry
@@ -44,61 +34,85 @@ mol.build_graph()
 mol.build_structure()
 ```
 
-### Processing LAMMPS Dump Files
+### Working with LAMMPS .dump files
 
 Handle molecular dynamics simulation output with element type mapping:
 
 ```python
-mol = molecule.Molecule()
-mol.input_geometry = "tests/data/dump_el.dump"
-mol.element_types = ["C", "H"]  # Map atom types to element symbols
+mol = molecule.Molecule("tests/data/dump_el.dump", ["C", "H"])
 
-# Use MDAnalysis backend for dump file processing
-mol.build_geometry(backend="MDAnalysis")
-mol.save_xyz("converted.xyz")
+# Use ovito backend for dump file processing
+mol.build_geometry(backend="ovito")
+mol.save_xyz("initial_geometry.xyz")
 
-# Analyze molecular connectivity
+# Build molecular connectivity
 mol.build_graph()
 mol.build_structure(cut_molecule=False)  # Preserve molecules with parts located inside the sphere
 
-# Select atoms within spatial region
-center_point = [1.0922, 0.89253, 1.03008]
+# Choose center point and radius for selection
+center = [1.0922, 0.89253, 1.03008]
 radius = 2
-selected_indices = mol.select_r(center_point, radius)
 
-# Extract molecular fragment with hydrogen capping
-new_mol, atom_indices = mol.select(selected_indices)
+# Extract molecular fragment
+new_mol, atom_indices = mol.select(mol.select_r(center, radius))
+# Or extract molecular fragment with respect to functional groups and infer charge
+new_mol, atom_indices = mol.select_after_expand(mol.expand_selection(mol.select_r(center, radius)))
 
 # Save extracted fragment
 mol.save_dump("fragment.dump", mol.input_geometry, atom_indices)
-new_mol.build_graph()
-new_mol.build_structure(cut_molecule=True)
 new_mol.save_xyz("fragment.xyz")
 new_mol.save_pdb("fragment.pdb")
 ```
 
-### Working with CFG Files
+### Working with MLIP .cfg Files
 
 Process MLIP configuration files with custom element type definitions:
 
 ```python
-mol = molecule.Molecule()
-mol.input_geometry = "tests/data/butane_cut.cfg"
-mol.element_types = ["C", "C", "H"]  # Define element types for CFG format
+mol = molecule.Molecule("tests/data/butane_cut.cfg", ["C", "C", "H"])
 
 # Use internal parser for CFG files
 mol.build_geometry(backend="internal")
 mol.build_graph()
-mol.build_structure(cut_molecule=False)
+mol.build_structure(cut_molecule=True) # passivate loose ends with hydrogens
 
-# Perform spatial selection
-selection_center = [44.1066, 57.6431, 52.0]
-selection_radius = 10.0
-selected_atoms = mol.select_r(selection_center, selection_radius)
-new_mol, indices = mol.select(selected_atoms)
+# Choose center point and radius for selection
+center = [44.1066, 57.6431, 52.0]
+radius = 5.0
+# Extract molecular fragment
+new_mol, atom_indices = mol.select(mol.select_r(center, radius))
+# Or extract molecular fragment with respect to functional groups and infer charge
+new_mol, atom_indices = mol.select_after_expand(mol.expand_selection(mol.select_r(center, radius)))
 
 # Export results
-mol.save_cfg("output.cfg", mol.input_geometry, indices)
+mol.save_cfg("output.cfg", mol.input_geometry, atom_indices)
+new_mol.save_xyz("extracted.xyz")
+new_mol.save_pdb("extracted.pdb")
+```
+
+### Working with .dump or .cfg files with respect to PBC
+
+```python
+mol = molecule.Molecule("tests/data/butane_cut.cfg", ["C", "C", "H"])
+
+# Use internal parser for CFG files
+mol.build_geometry(backend="internal")
+# provide cell in ovito format
+mol.cell = np.asarray([[60, 0, 0, 0], [0, 60, 0, 0], [0, 0, 60, 0]], dtype=float)
+mol.replicate_geometry() # make 3x3x3 replication of provided structure
+mol.build_graph()
+mol.build_structure(cut_molecule=False)
+
+# Choose center point and radius for selection
+center = [44.1066, 57.6431, 52.0]
+radius = 5.0
+# Extract molecular fragment
+new_mol, atom_indices = mol.select(mol.select_r(center, radius))
+# Or extract molecular fragment with respect to functional groups and infer charge
+new_mol, atom_indices = mol.select_after_expand(mol.expand_selection(mol.select_r(center, radius)))
+
+# Export results
+mol.save_cfg("output.cfg", mol.input_geometry, atom_indices)
 new_mol.save_xyz("extracted.xyz")
 new_mol.save_pdb("extracted.pdb")
 ```
@@ -107,18 +121,11 @@ new_mol.save_pdb("extracted.pdb")
 
 The library supports multiple backends for different operations:
 
-- **cclib**: Default backend for standard quantum chemistry file formats (XYZ, Gaussian, etc.)
+- **cclib**: Default backend for standard quantum chemistry file formats (XYZ)
 - **openbabel**: Chemical structure manipulation and PDB file handling
 - **MDAnalysis**: Molecular dynamics trajectory processing
+- **ovito**: Molecular dynamics trajectory processing (advised over MDAnalysis)
 - **internal**: Custom parsers for specialized formats (CFG, LAMMPS dump)
-
-## Development Tools
-
-The project employs modern Python development practices:
-- **pdm**: Project and dependency management
-- **ruff**: Code formatting and linting
-- **wemake-python-styleguide**: Code quality enforcement
-- **pflake8**: Additional style checking
 
 ## File Format Support
 
@@ -127,7 +134,6 @@ Ocellar handles various molecular file formats commonly used in computational ch
 - PDB: Protein Data Bank format
 - CFG: MLIP configuration files
 - LAMMPS dump: Molecular dynamics simulation output
-- Various quantum chemistry output formats (via cclib)
 
 ## License
 
