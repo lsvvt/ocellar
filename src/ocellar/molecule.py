@@ -177,6 +177,33 @@ class Molecule:
         driver = io.Driver(backend)
         self.graph = driver._build_bonds(self)
 
+    def build_structure(self, *, cut_molecule: bool) -> None:
+        """Build the substructure of the molecule by identifying connected components.
+
+        Parameters
+        ----------
+        cut_molecule : bool
+            Whether to break single bonds between heavy atoms.
+            When True, molecules are fragmented at single bonds connecting
+            atoms with multiple neighbors. When False, all bonds are preserved.
+
+        """
+        if self.graph is None:
+            raise ValueError("Graph is not built. Call build_graph() first.")
+
+        cutted_graph = self.graph.copy()
+
+        if cut_molecule:
+            single_bonds = [
+                (u, v) for u, v, d in cutted_graph.edges(data=True) if d["order"] == 1
+            ]
+            for u, v in single_bonds:
+                # if "H" not in [self.geometry[0][u], self.geometry[0][v]]:
+                if self.graph.degree[u] > 1 and self.graph.degree[v] > 1:
+                    cutted_graph.remove_edge(u, v)
+
+        self.subgraphs = [c for c in networkx.connected_components(cutted_graph)]
+
     def save_xyz(self, file_name: str, backend: str = "cclib") -> None:
         """Save the molecule geometry in XYZ format.
 
@@ -277,33 +304,6 @@ class Molecule:
         coordinates = self.geometry[1][idxs]
         driver._save_mlipff(file_name, coordinates, idxs)
 
-    def build_structure(self, *, cut_molecule: bool) -> None:
-        """Build the substructure of the molecule by identifying connected components.
-
-        Parameters
-        ----------
-        cut_molecule : bool
-            Whether to break single bonds between heavy atoms.
-            When True, molecules are fragmented at single bonds connecting
-            atoms with multiple neighbors. When False, all bonds are preserved.
-
-        """
-        if self.graph is None:
-            raise ValueError("Graph is not built. Call build_graph() first.")
-
-        cutted_graph = self.graph.copy()
-
-        if cut_molecule:
-            single_bonds = [
-                (u, v) for u, v, d in cutted_graph.edges(data=True) if d["order"] == 1
-            ]
-            for u, v in single_bonds:
-                # if "H" not in [self.geometry[0][u], self.geometry[0][v]]:
-                if self.graph.degree[u] > 1 and self.graph.degree[v] > 1:
-                    cutted_graph.remove_edge(u, v)
-
-        self.subgraphs = [c for c in networkx.connected_components(cutted_graph)]
-
     def select_r(self, center: list[float], r: float) -> list[int]:
         """Select atoms within a given radius of a point.
 
@@ -328,117 +328,62 @@ class Molecule:
         return idx
 
     def select(self, idxs: list[int]) -> tuple["Molecule", list[int]]:
-        """Select a subset of the molecule based on atom indices.
+        """Select complete fragments containing `idxs`.
 
         Parameters
         ----------
         idxs : list[int]
-            list of atom indices to select.
+            Atom indices that must be included (their whole fragments are
+            taken).
 
         Returns
         -------
         Molecule
-            A new Molecule object containing the selected atoms and necessary hydrogens.
-        tuple
-            A tuple containing:
-            - Molecule: A new Molecule object containing the selected atoms
-            and necessary hydrogens.
-            - list[int]: An array of selected atoms index.
+            New molecule containing the fragments and added hydrogens.
+        list[int]
+            Sorted indices of the original atoms that were copied.
 
         """
         if self.geometry is None or self.graph is None or self.subgraphs is None:
             raise ValueError(
                 "Molecule structure is not fully built."
-                "Call build_geometry(), build_graph(), and build_structure() first."
+                " Call build_geometry(), build_graph(), and build_structure() first."
             )
 
-        # Include complete molecular fragments containing selected atoms
+        # expand to whole sub-graphs
         selected_atoms = []
         for subgraph in self.subgraphs:
             if any(idx in idxs for idx in subgraph):
                 selected_atoms.extend(list(subgraph))
 
-        new_hydrogens = []
-        for atom in selected_atoms:
-            for neighbor in self.graph.neighbors(atom):
-                if neighbor not in selected_atoms:
-                    # Add hydrogen at standard C-H distance along bond direction
-                    bond_vector = self.geometry[1][neighbor] - self.geometry[1][atom]
-                    hydrogen_position = (
-                        norm(bond_vector) * 1.09 + self.geometry[1][atom]
-                    )
-                    new_hydrogens.append(hydrogen_position)
+        return self._passivate_fragments(selected_atoms)
 
-        new_molecule = Molecule()
-        selected_atoms.sort()
+    def select_after_expand(self, idxs: set[int]) -> tuple["Molecule", list[int]]:
+        """Build passivated copy from `selected_atoms* after expanding selection.
 
-        new_molecule.geometry = (
-            [self.geometry[0][i] for i in selected_atoms],
-            self.geometry[1][selected_atoms],
-        )
-
-        if len(new_hydrogens) > 0:
-            new_molecule.geometry = (
-                new_molecule.geometry[0] + ["H"] * len(new_hydrogens),
-                np.append(new_molecule.geometry[1], np.array(new_hydrogens), axis=0),
-            )
-
-        return new_molecule, selected_atoms
-
-    def select_after_expand(
-        self, selected_atoms: set[int]
-    ) -> tuple["Molecule", list[int]]:
-        """Select a subset of the molecule based on atom indices.
+        Keeps inferred formal charge.
 
         Parameters
         ----------
-        selected_atoms : set[int]
-            set of selected atom indices.
+        idxs : set[int]
+            Atom indices (already expanded to desired set).
 
         Returns
         -------
-        tuple: [Molecule, list[int]]
-            A tuple containing:
-            - Molecule: A new Molecule object containing the selected atoms
-            and necessary hydrogens with inferred charge.
-            - list[int]: A sorted array of selected atoms index.
+        Molecule
+            New molecule containing `selected_atoms` with hydrogens appended
+            and containing the inferred formal charge.
+        list[int]
+            Sorted indices of the original atoms that were copied.
 
         """
         if self.geometry is None or self.graph is None or self.subgraphs is None:
             raise ValueError(
                 "Molecule structure is not fully built."
-                "Call build_geometry(), build_graph(), and build_structure() first."
+                " Call build_geometry(), build_graph(), and build_structure() first."
             )
 
-        new_hydrogens = []
-        for atom in selected_atoms:
-            for neighbor in self.graph.neighbors(atom):
-                if neighbor not in selected_atoms:
-                    # Add hydrogen at standard C-H distance along bond direction
-                    bond_vector = self.geometry[1][neighbor] - self.geometry[1][atom]
-                    hydrogen_position = (
-                        norm(bond_vector) * 1.09 + self.geometry[1][atom]
-                    )
-                    new_hydrogens.append(hydrogen_position)
-
-        selected_atoms = sorted(list(selected_atoms))
-
-        new_molecule = Molecule()
-        new_molecule.charge = self.charge  # assign charge to new_mol
-        self.charge = 0  # restore charge for further usage
-
-        new_molecule.geometry = (
-            [self.geometry[0][i] for i in selected_atoms],
-            self.geometry[1][selected_atoms],
-        )
-
-        if len(new_hydrogens) > 0:
-            new_molecule.geometry = (
-                new_molecule.geometry[0] + ["H"] * len(new_hydrogens),
-                np.append(new_molecule.geometry[1], np.array(new_hydrogens), axis=0),
-            )
-
-        return new_molecule, selected_atoms
+        return self._passivate_fragments(idxs, copy_charge=True)
 
     def expand_selection(self, idxs: list[int]) -> set[int]:
         """Select electronegative atoms/functional group near the edge of selection.
@@ -450,7 +395,7 @@ class Molecule:
         Parameters
         ----------
         idxs : list[int]
-            List of atom indices of initial selection by radius.
+            list of atom indices of initial selection by radius.
 
         Returns
         -------
@@ -504,6 +449,74 @@ class Molecule:
 
         self.charge = total_charge
         return selected_atoms
+
+    def _passivate_fragments(
+        self,
+        atoms: list[int] | set[int],
+        *,
+        copy_charge: bool = False,
+    ) -> tuple["Molecule", list[int]]:
+        """Build a new molecule from `atoms`, adding terminal hydrogens.
+
+        Parameters
+        ----------
+        atoms : list[int] or set[int]
+            Atom indices that must appear in the returned molecule.
+        copy_charge : bool, optional
+            If `True` the formal charge stored in `self.charge` is
+            transferred to the new molecule and reset to zero on *self*.
+
+        Returns
+        -------
+        Molecule
+            New molecule containing the fragments and added hydrogens.
+        list[int]
+            Sorted indices of the original atoms that were copied.
+
+        Notes
+        -----
+        A hydrogen is appended for each missing neighbour of a selected
+        heavy atom. The hydrogen is placed 1.09 A along the vector
+        `(neighbour - atom)`.
+
+        """
+        if self.geometry is None or self.graph is None:
+            raise ValueError(
+                "Molecule structure is not fully built. "
+                "Call build_geometry() and build_graph() first."
+            )
+
+        new_h_positions: list[np.ndarray] = []
+
+        # Add hydrogens where the selected sub-structure is open-valent
+        for atom in atoms:
+            for neighbour in self.graph.neighbors(atom):
+                if neighbour not in atoms:
+                    bond_vec = self.geometry[1][neighbour] - self.geometry[1][atom]
+                    # add H at standard C-H distance
+                    h_pos = norm(bond_vec) * 1.09 + self.geometry[1][atom]
+                    new_h_positions.append(h_pos)
+
+        sorted_idx = sorted(list(atoms))
+        new_mol = Molecule()
+
+        # transfer charge if requested
+        if copy_charge:
+            new_mol.charge = self.charge
+            self.charge = 0
+
+        new_mol.geometry = (
+            [self.geometry[0][i] for i in sorted_idx],
+            self.geometry[1][sorted_idx],
+        )
+
+        if new_h_positions:
+            new_mol.geometry = (
+                new_mol.geometry[0] + ["H"] * len(new_h_positions),
+                np.append(new_mol.geometry[1], np.array(new_h_positions), axis=0),
+            )
+
+        return new_mol, sorted_idx
 
     def _infer_formal_charge(self, atom_id: int) -> int:
         """Infer formal charge for common functional groups.
