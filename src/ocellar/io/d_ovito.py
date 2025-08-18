@@ -1,7 +1,6 @@
 """Module to handle molecule operations using ovito."""
 
 import numpy as np
-from ovito.io import import_file
 
 from ocellar.io.driver import Driver
 
@@ -39,6 +38,8 @@ class DOvito(Driver):
             - numpy.ndarray: An array of atomic coordinates.
 
         """
+        from ovito.io import import_file
+
         p = import_file(input_geometry)
         data = p.compute(0)
         coordinates = np.asarray(data.particles_.positions_, dtype=float)
