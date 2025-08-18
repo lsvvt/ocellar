@@ -327,6 +327,64 @@ class Molecule:
         idx = tree.query_ball_point(center, r, workers=-1)
         return idx
 
+    def select(self, idxs: list[int]) -> tuple["Molecule", list[int]]:
+        """Select a subset of the molecule based on atom indices.
+
+        Parameters
+        ----------
+        idxs : list[int]
+            list of atom indices to select.
+
+        Returns
+        -------
+        Molecule
+            A new Molecule object containing the selected atoms and necessary hydrogens.
+        tuple
+            A tuple containing:
+            - Molecule: A new Molecule object containing the selected atoms
+            and necessary hydrogens.
+            - list[int]: An array of selected atoms index.
+
+        """
+        if self.geometry is None or self.graph is None or self.subgraphs is None:
+            raise ValueError(
+                "Molecule structure is not fully built."
+                "Call build_geometry(), build_graph(), and build_structure() first."
+            )
+
+        # Include complete molecular fragments containing selected atoms
+        selected_atoms = []
+        for subgraph in self.subgraphs:
+            if any(idx in idxs for idx in subgraph):
+                selected_atoms.extend(list(subgraph))
+
+        new_hydrogens = []
+        for atom in selected_atoms:
+            for neighbor in self.graph.neighbors(atom):
+                if neighbor not in selected_atoms:
+                    # Add hydrogen at standard C-H distance along bond direction
+                    bond_vector = self.geometry[1][neighbor] - self.geometry[1][atom]
+                    hydrogen_position = (
+                        norm(bond_vector) * 1.09 + self.geometry[1][atom]
+                    )
+                    new_hydrogens.append(hydrogen_position)
+
+        new_molecule = Molecule()
+        selected_atoms.sort()
+
+        new_molecule.geometry = (
+            [self.geometry[0][i] for i in selected_atoms],
+            self.geometry[1][selected_atoms],
+        )
+
+        if len(new_hydrogens) > 0:
+            new_molecule.geometry = (
+                new_molecule.geometry[0] + ["H"] * len(new_hydrogens),
+                np.append(new_molecule.geometry[1], np.array(new_hydrogens), axis=0),
+            )
+
+        return new_molecule, selected_atoms
+
     def select_after_expand(
         self, selected_atoms: set[int]
     ) -> tuple["Molecule", list[int]]:
