@@ -38,17 +38,35 @@ class DInternal(Driver):
             - np.ndarray: An array of atomic coordinates.
 
         """
+        elements = []
+        coordinates = []
+
         with open(input_geometry) as f:
             lines = f.readlines()
-            elements = []
-            coordinates = []
 
-            for line in lines:
-                if len(line.split()) > 7 and line.split()[1].isdigit():
-                    elements.append(element_types[int(line.split()[1])])
-                    coordinates.append(list(map(float, line.split()[2:5])))
-                elif "Energy" in line:
-                    break
+        for line in lines:
+            if "Size" in line:
+                n_atoms = int(next(lines).strip())
+            elif "AtomData" in line:
+                header = line.split(":", 1)[1].split()
+                type_idx, x_idx, y_idx, z_idx = (
+                    header.index(label)
+                    for label in ("type", "cartes_x", "cartes_y", "cartes_z")
+                )
+                if n_atoms is None:
+                    raise ValueError("Number of atoms record not found before header")
+                for _ in range(n_atoms):
+                    parts = next(lines).split()
+                    atom_type = int(parts[type_idx])
+                    elements.append(element_types[atom_type])
+                    coordinates.append(
+                        [
+                            float(parts[x_idx]),
+                            float(parts[y_idx]),
+                            float(parts[z_idx]),
+                        ]
+                    )
+                break
 
         return elements, np.array(coordinates)
 
