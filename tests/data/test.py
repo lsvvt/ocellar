@@ -9,7 +9,7 @@ mol.save_xyz("tmp.xyz")
 mol.build_graph()
 mol.build_structure(cut_molecule=False)  # without cutting single bonds
 
-new_mol, idxs = mol.select(
+new_mol, idxs = mol.select_after_expand(
     mol.select_r([1.09220004e0, 8.92530024e-01, 1.03007996e00], 0.1)
 )  # 1. Select atom idxs with sphere center and radius 2. Build new Molecule (with hydrogenes) and new idxs from idxs
 

@@ -327,7 +327,9 @@ class Molecule:
         idx = tree.query_ball_point(center, r, workers=-1)
         return idx
 
-    def select(self, selected_atoms: set[int]) -> tuple["Molecule", list[int]]:
+    def select_after_expand(
+        self, selected_atoms: set[int]
+    ) -> tuple["Molecule", list[int]]:
         """Select a subset of the molecule based on atom indices.
 
         Parameters
