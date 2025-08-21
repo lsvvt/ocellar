@@ -1,6 +1,6 @@
 [project]
 name = "ocellar"
-version = "0.2.1"
+version = "0.2.2"
 description = "ocellar project"
 authors = [
     {name = "lsvvt", email = "losev.tim.v@gmail.com"},

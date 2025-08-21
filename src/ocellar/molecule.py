@@ -435,7 +435,9 @@ class Molecule:
         for atom in selected_atoms:
             for neighbor in self.graph.neighbors(atom):
                 # do not replace CX2 fragment with two H's
-                if self.graph.degree[neighbor] >= 2:
+                if (
+                    self.graph.degree[neighbor] >= 2
+                ) and neighbor not in selected_atoms:
                     if (
                         sum(
                             neigh in selected_atoms
