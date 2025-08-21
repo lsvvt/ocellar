@@ -427,7 +427,14 @@ class Molecule:
             for neighbor in self.graph.neighbors(atom):
                 # do not replace CX2 fragment with two H's
                 if self.graph.degree[neighbor] >= 2:
-                    new_selected.add(neighbor)
+                    if (
+                        sum(
+                            neigh in selected_atoms
+                            for neigh in self.graph.neighbors(neighbor)
+                        )
+                        >= 2
+                    ):
+                        new_selected.add(neighbor)
                 # do not leave electronegative atoms on border
                 if self.geometry[0][neighbor] in electronegative_atoms:
                     new_selected.add(neighbor)
