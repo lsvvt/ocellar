@@ -97,7 +97,7 @@ mol = molecule.Molecule("tests/data/butane_cut.cfg", ["C", "C", "H"])
 
 # Use internal parser for CFG files
 mol.build_geometry(backend="internal")
-# provide cell in ovito format
+# provide cell in ovito format if NOT present in file
 mol.cell = np.asarray([[60, 0, 0, 0], [0, 60, 0, 0], [0, 0, 60, 0]], dtype=float)
 mol.replicate_geometry() # make 3x3x3 replication of provided structure
 mol.build_graph()
