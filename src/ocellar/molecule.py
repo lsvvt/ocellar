@@ -444,6 +444,7 @@ class Molecule:
                         >= 2
                     ):
                         new_selected.add(neighbor)
+                        new_selected.update(self.graph.neighbors(neighbor))
                 # do not leave electronegative atoms on border
                 if self.geometry[0][neighbor] in electronegative_atoms:
                     new_selected.add(neighbor)
