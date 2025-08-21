@@ -20,7 +20,7 @@ class DInternal(Driver):
     @classmethod
     def _build_geometry(
         cls, input_geometry: str, element_types: list[str]
-    ) -> tuple[list, np.ndarray]:
+    ) -> tuple[list, np.ndarray, np.ndarray]:
         """Build the geometry from a cfg file.
 
         Parameters
@@ -36,6 +36,7 @@ class DInternal(Driver):
             A tuple containing:
             - list: A list of element symbols.
             - np.ndarray: An array of atomic coordinates.
+            - np.ndarray: An array of simulation cell of shape 3x3 (column-wise vectors)
 
         """
         elements = []
@@ -45,6 +46,11 @@ class DInternal(Driver):
             for line in f:
                 if "Size" in line:
                     n_atoms = int(next(f).strip())
+                elif "Supercell" in line:
+                    vec1 = list(map(float, next(f).split()))
+                    vec2 = list(map(float, next(f).split()))
+                    vec3 = list(map(float, next(f).split()))
+                    cell = np.array([vec1, vec2, vec3], dtype=float).T
                 elif "AtomData" in line:
                     header = line.split(":", 1)[1].split()
                     type_idx, x_idx, y_idx, z_idx = (
@@ -68,7 +74,7 @@ class DInternal(Driver):
                         )
                     break
 
-        return elements, np.asarray(coordinates, dtype=float)
+        return elements, np.asarray(coordinates, dtype=float), cell
 
     @classmethod
     def _save_cfg(cls, file_name: str, input_geometry: str, idxs: list[int]) -> None:

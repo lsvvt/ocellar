@@ -20,7 +20,7 @@ class DOvito(Driver):
     @classmethod
     def _build_geometry(
         cls, input_geometry: str, element_types: list[str]
-    ) -> tuple[list, np.ndarray]:
+    ) -> tuple[list, np.ndarray, np.ndarray]:
         """Build the geometry from a LAMMPS dump file using MDAnalysis.
 
         Parameters
@@ -35,7 +35,8 @@ class DOvito(Driver):
         tuple
             A tuple containing:
             - list: A list of element symbols.
-            - numpy.ndarray: An array of atomic coordinates.
+            - np.ndarray: An array of atomic coordinates.
+            - np.ndarray: An array of simulation cell of shape 3x4 (column-wise vectors)
 
         """
         from ovito.io import import_file
