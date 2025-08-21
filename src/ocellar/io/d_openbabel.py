@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import networkx
-import numpy
+import numpy as np
 import periodictable
 from openbabel import openbabel, pybel
+from scipy.spatial import KDTree
 
 from ocellar.io.driver import Driver
 
@@ -28,7 +29,7 @@ class DOpenbabel(Driver):
     backend = "openbabel"
 
     @classmethod
-    def _build_geometry(cls, input_geometry: str) -> tuple[list, numpy.ndarray]:
+    def _build_geometry(cls, input_geometry: str) -> tuple[list, np.ndarray]:
         """Build the geometry from the input file using openbabel.
 
         Parameters
@@ -46,7 +47,7 @@ class DOpenbabel(Driver):
         """
         mol = next(pybel.readfile("xyz", input_geometry))
         elements = [periodictable.elements[atom.atomicnum].symbol for atom in mol.atoms]
-        coordinates = numpy.array([atom.coords for atom in mol.atoms])
+        coordinates = np.array([atom.coords for atom in mol.atoms])
         return elements, coordinates
 
     @classmethod
@@ -89,7 +90,50 @@ class DOpenbabel(Driver):
         return molecule_graph
 
     @classmethod
-    def _save_pdb(cls, file_name: str, geometry: tuple[list, numpy.ndarray]) -> None:
+    def _build_bonds_local(
+        cls,
+        mol: Molecule,
+    ) -> networkx.Graph:
+        """Build a graph representation of molecular bonds using openbabel.
+
+        Parameters
+        ----------
+        mol : ocellar.Molecule
+            An object of class Molecule with built geometry.
+
+        Returns
+        -------
+        molecule_graph : networkx.Graph
+            A graph representation of the molecular structure with bonds as edges.
+
+        """
+        center = np.asarray(mol.center, dtype=float)
+        tree = KDTree(data=mol.geometry[1])
+        idx = tree.query_ball_point(center, mol.r, workers=-1)
+        obmol = openbabel.OBMol()
+
+        for id in idx:
+            element = mol.geometry[0][id]
+            atom = obmol.NewAtom(id)
+            atom.SetAtomicNum(periodictable.elements.symbol(element).number)
+            x, y, z = mol.geometry[1][id]
+            atom.SetVector(x, y, z)
+
+        obmol.ConnectTheDots()
+        obmol.PerceiveBondOrders()
+
+        molecule_graph = networkx.Graph()
+        for bond in openbabel.OBMolBondIter(obmol):
+            molecule_graph.add_edge(
+                bond.GetBeginAtom().GetId(),
+                bond.GetEndAtom().GetId(),
+                order=bond.GetBondOrder(),
+            )
+
+        return molecule_graph
+
+    @classmethod
+    def _save_pdb(cls, file_name: str, geometry: tuple[list, np.ndarray]) -> None:
         """Save the geometry in PDB format using openbabel.
 
         Parameters

@@ -166,20 +166,25 @@ class Molecule:
 
         self.geometry = (replicated_elements, replicated_coords)
 
-    def build_graph(self, backend: str = "openbabel") -> None:
+    def build_graph(self, backend: str = "openbabel", local=False) -> None:
         """Build the graph representation of the molecule.
 
         Parameters
         ----------
         backend : str, optional
             The backend to use for building the graph (default is "openbabel").
+        local : bool, optional
+            True, if local version of building the graph is requested. Default is False.
 
         """
         if self.geometry is None:
             raise ValueError("Geometry is not built. Call build_geometry() first.")
 
         driver = io.Driver(backend)
-        self.graph = driver._build_bonds(self)
+        if local:
+            self.graph = driver._build_bonds_local(self)
+        else:
+            self.graph = driver._build_bonds(self)
 
     def build_structure(self, *, cut_molecule: bool) -> None:
         """Build the substructure of the molecule by identifying connected components.

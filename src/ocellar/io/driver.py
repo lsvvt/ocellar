@@ -25,6 +25,10 @@ class Driver:
         raise NotImplementedError(inspect.stack()[0][3], cls.backend)
 
     @classmethod
+    def _build_bonds_local(cls, *args, **kwargs):
+        raise NotImplementedError(inspect.stack()[0][3], cls.backend)
+
+    @classmethod
     def _save_xyz(cls, *args, **kwargs):
         raise NotImplementedError(inspect.stack()[0][3], cls.backend)
 
