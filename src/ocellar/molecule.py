@@ -115,6 +115,10 @@ class Molecule:
             self.geometry = driver._build_geometry(
                 self.input_geometry, self.element_types
             )
+            # set cell from ovito or cfg backends
+            if len(self.geometry) == 3:
+                self.cell = self.geometry[2]
+                self.geometry = self.geometry[0], self.geometry[1]
 
     def replicate_geometry(self) -> None:
         """Replicate current geometry into a 3x3x3 supercell.

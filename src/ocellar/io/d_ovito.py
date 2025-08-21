@@ -45,5 +45,6 @@ class DOvito(Driver):
         coordinates = np.asarray(data.particles_.positions_, dtype=float)
         types = np.asarray(data.particles_.particle_types_, dtype=int)
         elements = [element_types[i - 1] for i in types]
+        cell = np.asarray(data.cell, dtype=float)
 
-        return elements, coordinates
+        return elements, coordinates, cell
