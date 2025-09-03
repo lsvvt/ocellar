@@ -508,6 +508,7 @@ class Molecule:
             )
 
         new_h_positions: list[np.ndarray] = []
+        new_h_parents: list[int] = []
 
         # Add hydrogens where the selected sub-structure is open-valent
         for atom in atoms:
@@ -517,8 +518,10 @@ class Molecule:
                     # add H at standard C-H distance
                     h_pos = norm(bond_vec) * 1.09 + self.geometry[1][atom]
                     new_h_positions.append(h_pos)
+                    new_h_parents.append(atom)
 
         sorted_idx = sorted(list(atoms))
+        mapping = {old_id: new_id for new_id, old_id in enumerate(sorted_idx)}
         new_mol = Molecule()
 
         # transfer charge if requested
@@ -530,6 +533,20 @@ class Molecule:
             [self.geometry[0][i] for i in sorted_idx],
             self.geometry[1][sorted_idx],
         )
+        new_mol.graph = networkx.Graph()
+        for atom in sorted_idx:
+            for neighbour in self.graph.neighbors(atom):
+                if neighbour not in mapping:
+                    continue
+                order = self.graph.get_edge_data(atom, neighbour)["order"]
+                new_mol.graph.add_edge(mapping[atom], mapping[neighbour], order=order)
+
+        for new_h_id, parent_id in enumerate(new_h_parents):
+            new_mol.graph.add_edge(
+                mapping[parent_id],
+                len(sorted_idx) + new_h_id,
+                order=1,
+            )
 
         if new_h_positions:
             new_mol.geometry = (
